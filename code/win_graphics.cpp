@@ -1,8 +1,4 @@
-// platform-specific code for the renderer
-// devenv ..\..\build\win_graphics.exe -- load VS
-
-// #include win_graphics.h
-// #include graphics.h
+// NOTE(cerisa): platform-specific code for the renderer
 
 #include "libraries/gif.h"
 #include <windows.h>
@@ -22,23 +18,20 @@ typedef uint64_t uint64;
 #include "win_graphics.h"
 #include "graphics.h"
 
-// internal WinCompressColor(uint32)
-
 int main(int argc, const char* argv[])
 {
 	bool test = FALSE;
-	uint32 delay = 42;
 
 	MEMORY memory = {};
 	FRAME frame = {};
 	uint8 * image = {};
 
-	Initialize(&memory, &frame);
+	InitializeMemory(&memory, &frame);
 
 	int frame_memory_size = frame.width * frame.height * frame.bytes_per_pixel;
 	frame.memory = VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
-	int image_size = frame.width * frame.height * WIN_COLOR_DEPTH_BYTES;
+	int image_size = frame.width * frame.height * WIN_BYTES_PER_PIXEL;
 	image = (uint8 *)VirtualAlloc(0, image_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 #if GRAPHICS_INTERNAL
@@ -52,26 +45,32 @@ int main(int argc, const char* argv[])
 	memory.permanent_storage = memory_block;
 	memory.transient_storage = ((uint8 *)memory_block + memory.permanent_storage_size);
 
-	uint8 *row = image;
-	for (uint64 y = 0; y < frame.height; y++)
+	while (GetNextFrame(&memory, &frame))
 	{
-		uint8 *pixel = row;
-		for(uint64 x = 0; x < frame.width; x++)
+		uint8 *pixel = image;
+		uint8 *source_pixel = (uint8 *)(((uint64)frame.memory) + frame.color_depth_bytes - 1);
+		// NOTE(cerisa): tricky conversions to allow for a greater color depth
+		// in the renderer than in the output gif, and to accomodate for
+		// little-endian memory
+		for (uint64 y = 0; y < frame.height; y++)
 		{
-			*pixel++ = 0xFF;
-			*pixel++ = 0x00;
-			*pixel++ = 0xFF;
-			*pixel++;
+			for(uint64 x = 0; x < frame.width; x++)
+			{
+				*pixel++ = *source_pixel;
+				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+				*pixel++ = *source_pixel;
+				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+				*pixel++ = *source_pixel;
+				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+				*pixel++;
+				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+			}
 		}
-		row += frame.width * 4;
+		const uint8 * output_image = (uint8 *)image;
+		GifWriter writer;
+		test = GifBegin(&writer, "test.gif", frame.width, frame.height, frame.delay);
+		test = GifWriteFrame(&writer, output_image, frame.width, frame.height, frame.delay);
+
 	}
-
-
-	const uint8 * firstImage = (uint8 *)image;
-
-	GifWriter writer;
-	test = GifBegin(&writer, "test.gif", frame.width, frame.height, delay);
-	test = GifWriteFrame(&writer, firstImage, frame.width, frame.height, delay);
-
 	return(0);
 }

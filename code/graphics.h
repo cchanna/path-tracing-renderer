@@ -1,18 +1,15 @@
 #if !defined (GRAPHICS_H)
 
-
 #define Kilobytes(Value) (Value*1024LL)
 #define Megabytes(Value) (Kilobytes(Value)*1024LL)
 #define Gigabytes(Value) (Megabytes(Value)*1024LL)
 #define Terabytes(Value) (Gigabytes(Value)*1024LL)
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
-
 #define Pi32 3.1415926539f
 #define internal static
 #define local_persist static
 #define global_variable static
-
 
 struct MEMORY
 {
@@ -31,8 +28,14 @@ struct FRAME
     uint32 width;
     uint32 height;
     uint32 pitch;
+	uint32 color_depth_bytes;
 	uint32 bytes_per_pixel;
 	uint32 delay;
+};
+
+struct STATE
+{
+	int frame_count;
 };
 
 internal void
