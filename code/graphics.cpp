@@ -1,3 +1,5 @@
+// NOTE(cch): where the magic happens
+
 internal void
 InitializeMemory(MEMORY* memory, FRAME* frame)
 {
@@ -29,10 +31,10 @@ GetNextFrame(MEMORY* memory, FRAME* frame)
 	{
 		for (uint64 x = 0; x < frame->width; x++)
 		{
-			*pixel++ = 0xFF; // NOTE(cerisa) red
-			*pixel++ = 0xAA; // NOTE(cerisa) green
-			*pixel++ = 0xAF; // NOTE(cerisa) blue
-			*pixel++;        // NOTE(cerisa) unused alpha layer
+			*pixel++ = 0xFF; // NOTE(cch): red
+			*pixel++ = 0xAA; // NOTE(cch): green
+			*pixel++ = 0xAF; // NOTE(cch): blue
+			*pixel++;        // NOTE(cch): unused alpha layer
 		}
 	}
 	state->frame_count++;

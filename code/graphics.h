@@ -40,11 +40,15 @@ struct STATE
 
 internal void
 Initialize(MEMORY* memory, FRAME* frame);
-
-// internal bool32
-// GetNextFrame(MEMORY* memory, FRAME* frame);
-
 #include "graphics.cpp"
+// NOTE(cch): this sets up the MEMORY and FRAME structs so that the platform
+// layer can know how much memory needs to be allocated for them. this way you
+// can edit the properties of the image without touching win_graphics.cpp
+// NOTE(cch): i guess this is a constructor? except without all the baggage that
+// might come with that term
+
+internal bool32
+GetNextFrame(MEMORY* memory, FRAME* frame);
 
 #define GRAPHICS_H
 #endif

@@ -1,4 +1,4 @@
-// NOTE(cerisa): platform-specific code for the renderer
+// NOTE(cch): platform-specific code for the renderer
 
 #include "libraries/gif.h"
 #include <windows.h>
@@ -28,6 +28,9 @@ int main(int argc, const char* argv[])
 
 	InitializeMemory(&memory, &frame);
 
+	// NOTE(cch): the goal is for all allocations to be in one place, and held
+	// exclusively in the platform layer. memory leaks become impossible and the
+	// whole thing feels a lot less slapdash this way
 	int frame_memory_size = frame.width * frame.height * frame.bytes_per_pixel;
 	frame.memory = VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
@@ -49,7 +52,7 @@ int main(int argc, const char* argv[])
 	{
 		uint8 *pixel = image;
 		uint8 *source_pixel = (uint8 *)(((uint64)frame.memory) + frame.color_depth_bytes - 1);
-		// NOTE(cerisa): tricky conversions to allow for a greater color depth
+		// NOTE(cch): tricky conversions to allow for a greater color depth
 		// in the renderer than in the output gif, and to accomodate for
 		// little-endian memory
 		for (uint64 y = 0; y < frame.height; y++)
