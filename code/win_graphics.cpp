@@ -17,6 +17,7 @@ typedef uint64_t uint64;
 
 #include "win_graphics.h"
 #include "graphics.h"
+#include "graphics.cpp"
 
 int main(int argc, const char* argv[])
 {
