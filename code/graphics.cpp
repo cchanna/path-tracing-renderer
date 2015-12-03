@@ -1,5 +1,8 @@
 // NOTE(cch): where the magic happens
 
+#include "matrix_3d.h"
+#include "matrix_3d.cpp"
+
 internal void
 InitializeMemory(MEMORY* memory, FRAME* frame)
 {
