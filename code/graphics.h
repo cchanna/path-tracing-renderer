@@ -6,7 +6,7 @@
 #define Terabytes(Value) (Gigabytes(Value)*1024LL)
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
-#define Pi32 3.1415926539f
+#define TAU_32 6.2831853071f
 #define internal static
 #define local_persist static
 #define global_variable static
