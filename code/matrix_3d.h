@@ -1,5 +1,4 @@
 // NOTE(cch): new matrix math library
-
 #include <math.h>
 #include "vector_3d.h"
 #include "vector_3d.cpp"
@@ -32,12 +31,23 @@ void Matrix3D_ReflectX(float mtx[4][4], float inv[4][4]);
 void Matrix3D_ReflectY(float mtx[4][4], float inv[4][4]);
 void Matrix3D_ReflectZ(float mtx[4][4], float inv[4][4]);
 
-void Matrix3D_MultiplyPoint(float out[3], float mtx[4][4], float in[3]);
-void Matrix3D_MultiplyPoints(float *out[3], float mtx[4][4], float *in[3], int count);
-// NOTE(cch): out = mtx * in, where out and in are vertically-aligned vectors
+void Matrix3D_MultiplyVector(VECTOR3D *out, float mtx[4][4], float inv[4][4], VECTOR3D *in);
+
+// void Matrix3D_MultiplyPoint(float out[3], float mtx[4][4], float in[3]);
+// void Matrix3D_MultiplyPoints(float *out[3], float mtx[4][4], float *in[3], int count);
+// NOTE(cch): out = mtx * in, where out and in are vertically-aligned
+
+// void Matrix3D_MultiplyVector(float out[3], float inv[4][4], float in[3]);
+// void Matrix3D_MultiplyVectors(float *out[3], float inv[4][4], float *in[3], int count);
+// NOTE(cch): notice that you need to supply the inverse of the intended
+// transformation matrix. it feels like it'd be a waste to re-calculate the
+// inverse when it's usually already around.
+
+
 
 int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3], float up[3]);
 int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3]);
+// TODO(cch): update to use VECTOR3D struct
 // NOTE(cch): construct the view matrix and its inverse given the location of
 // the eye, the center of interest, and an up point.
 // NOTE(cch): if no up point is given it'll assume 'up' is along positive z

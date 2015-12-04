@@ -1,14 +1,32 @@
-// NOTE(cch): not sure if I actually need a library for this, but it might prove
-// useful
+#if !defined (VECTOR_3D_CPP)
 
-void Vector3D_Copy(float a[3], float b[3])
+struct VECTOR3D
 {
-	a[0] = b[0];
-	a[1] = b[1];
-	a[2] = b[2];
+	float x,y,z;
+	bool32 is_point;
+};
+
+void Vector3D_Copy(VECTOR3D *a, VECTOR3D *b)
+{
+	a->x = b->x;
+	a->y = b->y;
+	a->z = b->z;
+	a->is_point = b->is_point;
 }
 
+//TODO(cch): update to use new VECTOR3D struct
 float Vector3D_Length(float a[3])
 {
 	return (float) sqrt(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
 }
+
+void Vector3D_GetVectorFromPoints(VECTOR3D *result, VECTOR3D *origin, VECTOR3D *direction)
+{
+	result->x = direction->x - origin->x;
+	result->y = direction->y - origin->y;
+	result->z = direction->z - origin->z;
+	result->is_point = FALSE;
+}
+
+#define VECTOR_3D_CPP
+#endif

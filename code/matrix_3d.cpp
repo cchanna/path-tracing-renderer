@@ -9,6 +9,19 @@ void Matrix3D_Copy(float a[4][4], float b[4][4])
 	}
 }
 
+void Matrix3D_Transpose(float out[4][4], float in[4][4])
+{
+	float tmp[4][4];
+	for (int r = 0; r < 4; r++)
+	{
+		for (int c = 0; c < 4; c++)
+		{
+			tmp[c][r] = in[r][c];
+		}
+	}
+	Matrix3D_Copy(out, tmp);
+}
+
 void Matrix3D_Multiply(float res[4][4], float a[4][4], float b[4][4])
 {
 	float tmp[4][4];
@@ -154,25 +167,70 @@ void Matrix3D_ReflectZ(float mtx[4][4], float inv[4][4])
 	Matrix3D_Multiply(inv,inv,tmp);
 }
 
-void Matrix3D_MultiplyPoint(float out[3], float mtx[4][4], float in[3])
+inline float
+Matrix3D_DotProduct(VECTOR3D *vector, float row[4])
 {
-	float tmp[3] = {};
-	for (int i=0; i < 3; i++)
-	{
-		tmp[i] = mtx[i][0]*in[0] + mtx[i][1]*in[1] + mtx[i][2]*in[2] + mtx[i][3];
-	}
-	out[0] = tmp[0];
-	out[1] = tmp[1];
-	out[2] = tmp[2];
+	return row[0]*vector->x + row[1]*vector->y + row[2]*vector->z + row[3];
 }
 
-void Matrix3D_MultiplyPoints(float *out[3], float mtx[4][4], float *in[3], int count)
+void Matrix3D_MultiplyVector(VECTOR3D *out, float mtx[4][4], float inv[4][4], VECTOR3D *in)
 {
-	for (int i = 0; i < count; i++)
+	VECTOR3D tmp = {};
+	if (in->is_point)
 	{
-		Matrix3D_MultiplyPoint(out[i], mtx, in[i]);
+		tmp.x = mtx[0][0]*in->x + mtx[0][1]*in->y + mtx[0][2]*in->z + mtx[0][3];
+		tmp.y = mtx[1][0]*in->x + mtx[1][1]*in->y + mtx[1][2]*in->z + mtx[1][3];
+		tmp.z = mtx[2][0]*in->x + mtx[2][1]*in->y + mtx[2][2]*in->z + mtx[2][3];
 	}
+	else
+	{
+		float transpose[4][4];
+		Matrix3D_Transpose(transpose,inv);
+		tmp.x = transpose[0][0]*in->x + transpose[0][1]*in->y + transpose[0][2]*in->z + transpose[0][3];
+		tmp.y = transpose[1][0]*in->x + transpose[1][1]*in->y + transpose[1][2]*in->z + transpose[1][3];
+		tmp.z = transpose[2][0]*in->x + transpose[2][1]*in->y + transpose[2][2]*in->z + transpose[2][3];
+	}
+	Vector3D_Copy(out, &tmp);
 }
+
+// void Matrix3D_MultiplyPoint(float out[3], float mtx[4][4], float in[3])
+// {
+// 	float tmp[3] = {};
+// 	for (int i=0; i < 3; i++)
+// 	{
+// 		tmp[i] = mtx[i][0]*in[0] + mtx[i][1]*in[1] + mtx[i][2]*in[2] + mtx[i][3];
+// 	}
+// 	Vector3D_Copy(out,in);
+// }
+//
+//
+// void Matrix3D_MultiplyPoints(float *out[3], float mtx[4][4], float *in[3], int count)
+// {
+// 	for (int i = 0; i < count; i++)
+// 	{
+// 		Matrix3D_MultiplyPoint(out[i], mtx, in[i]);
+// 	}
+// }
+//
+// void Matrix3D_MultiplyVector(float out[3], float inv[4][4], float in[3])
+// {
+// 	float tmp[3] = {};
+// 	for (int i=0; i < 3; i++)
+// 	{
+// 		tmp[i] = inv[i][0]*in[0] + inv[i][1]*in[1] + inv[i][2]*in[2];
+// 	}
+// 	Vector3D_Copy(out,in);
+// }
+//
+// void Matrix3D_MultiplyVectors(float *out[3], float inv[4][4], float *in[3], int count)
+// {
+// 	float tmp[4][4];
+// 	Matrix3D_Transpose();
+// 	for (int i = 0; i < count, i++)
+// 	{
+// 		Matrix3D_MultiplyVector(out[i], inv, in[i]);
+// 	}
+// }
 
 void Matrix3D_CrossProduct(float res[3], float a[3], float b[3])
 {
@@ -216,7 +274,7 @@ int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], floa
 	{
 		float up_tmp[3];
 		float up_tmp_length;
-		Matrix3D_MultiplyPoint(up_tmp,view,up);
+		// Matrix3D_MultiplyPoint(up_tmp,view,up);
 		up_tmp_length = (float) sqrt(up_tmp[0]*up_tmp[0] + up_tmp[2]*up_tmp[2]);
 
 		if (up_tmp_length == 0) return 0;
