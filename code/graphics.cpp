@@ -24,21 +24,20 @@ Raytrace(uint8 rgb[3], VECTOR3D *eye, VECTOR3D *vector)
 	float sphere_mtx[4][4],sphere_inv[4][4];
 	Matrix3D_GetIdentity(sphere_mtx);
 	Matrix3D_GetIdentity(sphere_inv);
-	Matrix3D_Translate(sphere_mtx,sphere_inv,0.0f,5.0f,0.0f);
+	Matrix3D_Translate(sphere_mtx,sphere_inv,0.0f,10.0f,0.0f);
 	VECTOR3D eye_object, vector_object;
-	Matrix3D_MultiplyVector(&eye_object,sphere_mtx,sphere_inv,eye);
-	Matrix3D_MultiplyVector(&vector_object,sphere_mtx,sphere_inv,vector);
+	Matrix3D_MultiplyVector(&eye_object,sphere_inv,sphere_mtx,eye);
+	Matrix3D_MultiplyVector(&vector_object,sphere_inv,sphere_mtx,vector);
 	float distance;
 	{
 		// NOTE(cch): intersection with a sphere
 		// NOTE(cch): quadratic formula
-		// TODO(cch): this is broken
-		float a = vector->x*vector->x + vector->y*vector->y + vector->z*vector->z;
-		float b = 2*((eye->x*vector->x) + (eye->y*vector->y) + (eye->z*vector->z));
-		float c = eye->x*eye->x + eye->y*eye->y + eye->z*eye->z - 1;
+		float a = vector_object.x*vector_object.x + vector_object.y*vector_object.y + vector_object.z*vector_object.z;
+		float b = 2*((eye_object.x*vector_object.x) + (eye_object.y*vector_object.y) + (eye_object.z*vector_object.z));
+		float c = eye_object.x*eye_object.x + eye_object.y*eye_object.y + eye_object.z*eye_object.z - 1;
 		float root = b*b - 4*a*c;
 		if (root < 0) distance = 0;
-		if (root == 0)
+		else if (root == 0)
 		{
 			distance = -b/(2*a);
 		}
@@ -100,7 +99,8 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 			VECTOR3D vector;
 			vector.x = (x - frame->width/2.0f)*(camera->width / frame->width);
 			vector.y = 1.0f;
-			vector.x = (y - frame->height/2.0f)*(camera->height / frame->height);
+			vector.z = (y - frame->height/2.0f)*(camera->height / frame->height);
+			Vector3D_Normalize(&vector,&vector);
 			uint8 rgb[3] = {};
 			Raytrace(rgb,&camera->eye,&vector);
 			*pixel++ = rgb[0]; // NOTE(cch): red
