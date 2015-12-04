@@ -54,6 +54,7 @@ void Matrix3D_GetIdentity(float a[4][4])
 void Matrix3D_Translate(float mtx[4][4], float inv[4][4], float dx, float dy, float dz)
 {
 	float tmp[4][4] = {};
+	Matrix3D_GetIdentity(tmp);
 	tmp[0][3] = dx;
 	tmp[1][3] = dy;
 	tmp[2][3] = dz;
