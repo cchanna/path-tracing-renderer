@@ -1,11 +1,5 @@
 #if !defined (VECTOR_3D_CPP)
 
-struct VECTOR3D
-{
-	float x,y,z;
-	bool32 is_point;
-};
-
 void Vector3D_Copy(VECTOR3D *a, VECTOR3D *b)
 {
 	a->x = b->x;
