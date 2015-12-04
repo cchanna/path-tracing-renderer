@@ -11,6 +11,9 @@
 #define local_persist static
 #define global_variable static
 
+#include "matrix_3d.h"
+#include "matrix_3d.cpp"
+
 struct MEMORY
 {
 	// bool32 is_initialized;
@@ -24,7 +27,7 @@ struct MEMORY
 
 struct FRAME
 {
-	void * memory;
+	void *memory;
     uint32 width;
     uint32 height;
     uint32 pitch;
@@ -33,13 +36,25 @@ struct FRAME
 	uint32 delay;
 };
 
+struct CAMERA
+{
+	float half_angle_x;
+	float half_angle_y;
+	float height;
+	float width;
+	float yon;
+	VECTOR3D eye, coi, up;
+};
+
 struct STATE
 {
-	int frame_count;
+	bool32 is_initialized;
+	uint32 frame_count;
+	CAMERA camera;
 };
 
 internal void
-Initialize(MEMORY* memory, FRAME* frame);
+Initialize(MEMORY *memory, FRAME *frame);
 // NOTE(cch): this sets up the MEMORY and FRAME structs so that the platform
 // layer can know how much memory needs to be allocated for them. this way you
 // can edit the properties of the image without touching win_graphics.cpp
@@ -47,7 +62,7 @@ Initialize(MEMORY* memory, FRAME* frame);
 // might come with that term
 
 internal bool32
-GetNextFrame(MEMORY* memory, FRAME* frame);
+GetNextFrame(MEMORY *memory, FRAME *frame);
 
 #define GRAPHICS_H
 #endif
