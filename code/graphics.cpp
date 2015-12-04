@@ -46,8 +46,8 @@ Raytrace(uint8 rgb[3], VECTOR3D *eye, VECTOR3D *vector)
 			float t1 = (float)(-b + sqrt(root))/(2*a);
 			float t2 = (float)(-b - sqrt(root))/(2*a);
 
-			if ((t1 < 0) && (t2 < 0)) return 0;
-			if ((t2 < 0) || ((t1 >= 0) && (t1 <= t2)))
+			if ((t1 < 0) && (t2 < 0)) distance = 0;
+			else if ((t2 < 0) || ((t1 >= 0) && (t1 <= t2)))
 			{
 				distance =  t1;
 			}
