@@ -10,25 +10,27 @@ InitializeMemory(MEMORY *memory, FRAME *frame)
 	memory->transient_storage_size = Kilobytes(1);
 
 
-	frame->width = 800;
-	frame->height = 800;
+	frame->width = 500;
+	frame->height = 500;
 	frame->color_depth_bytes = 1;
 	frame->bytes_per_pixel = frame->color_depth_bytes * 4;
 	frame->pitch = frame->bytes_per_pixel * frame->width;
-	frame->delay = 42;
+	frame->delay = 50;
+	frame->dithering = 7.0f;
 }
 
 internal float
-Raytrace(uint8 rgb[3], VECTOR3D *eye, VECTOR3D *vector)
+Raytrace(uint8 rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dithering)
 {
 	float sphere_mtx[4][4],sphere_inv[4][4];
 	Matrix3D_GetIdentity(sphere_mtx);
 	Matrix3D_GetIdentity(sphere_inv);
-	Matrix3D_Translate(sphere_mtx,sphere_inv,0.0f,10.0f,0.0f);
-	VECTOR3D eye_object, vector_object;
+	Matrix3D_Translate(sphere_mtx,sphere_inv,0.0f,2.0f,0.0f);
+	VECTOR3D eye_object = {};
+	VECTOR3D vector_object = {};
 	Matrix3D_MultiplyVector(&eye_object,sphere_inv,sphere_mtx,eye);
 	Matrix3D_MultiplyVector(&vector_object,sphere_inv,sphere_mtx,vector);
-	float distance;
+	float distance = 0;
 	{
 		// NOTE(cch): intersection with a sphere
 		// NOTE(cch): quadratic formula
@@ -57,16 +59,40 @@ Raytrace(uint8 rgb[3], VECTOR3D *eye, VECTOR3D *vector)
 			}
 		}
 	}
-	if (distance > 0)
+	if (distance <= 0)
 	{
 		rgb[0] = 0x00; rgb[1] = 0x00; rgb[2] = 0x00;
-		return distance;
-	}
-	else
-	{
-		rgb[0] = 0xFF; rgb[1] = 0xFF; rgb[2] = 0xFF;
 		return 0;
 	}
+	VECTOR3D point_object = {};
+	point_object.x = eye_object.x + (vector_object.x * distance);
+	point_object.y = eye_object.y + (vector_object.y * distance);
+	point_object.z = eye_object.z + (vector_object.z * distance);
+	point_object.is_point = TRUE;
+
+	VECTOR3D light = {};
+	light.x = -1.0f;
+	light.y = -1.0f;
+	light.z = 2.0f;
+	VECTOR3D light_object = {};
+	Matrix3D_MultiplyVector(&light_object,sphere_inv,sphere_mtx,&light);
+	float diffuse = 0;
+	{
+		float dot_product = 0;
+		Vector3D_Normalize(&light_object,&light_object);
+		dot_product = Vector3D_DotProduct(&light_object,&point_object);
+		if (dot_product <= 0.0f) diffuse =  0.0f;
+		else diffuse = dot_product;
+	}
+	float random = ((rand() * dithering)/RAND_MAX) - (dithering / 2.0f);
+	diffuse = (diffuse*255.0f) + random;
+	if (diffuse < 0.0f) diffuse = 0.0f;
+	if (diffuse > 255.0f) diffuse = 255.0f;
+	rgb[0] = (uint8) (diffuse);
+	rgb[1] = (uint8) (diffuse);
+	rgb[2] = (uint8) (diffuse);
+	return distance;
+
 }
 
 internal bool32
@@ -87,7 +113,7 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 		camera->coi.is_point = TRUE;
 		camera->up.is_point = TRUE;
 	}
-	if (state->frame_count > 0)
+	if (state->frame_count >= 1)
 	{
 		return FALSE;
 	}
@@ -96,13 +122,13 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 	{
 		for (uint32 x = 0; x < frame->width; x++)
 		{
-			VECTOR3D vector;
+			VECTOR3D vector = {};
 			vector.x = (x - frame->width/2.0f)*(camera->width / frame->width);
 			vector.y = 1.0f;
-			vector.z = (y - frame->height/2.0f)*(camera->height / frame->height);
+			vector.z = -(y - frame->height/2.0f)*(camera->height / frame->height);
 			Vector3D_Normalize(&vector,&vector);
 			uint8 rgb[3] = {};
-			Raytrace(rgb,&camera->eye,&vector);
+			Raytrace(rgb,&camera->eye,&vector,state,frame->dithering);
 			*pixel++ = rgb[0]; // NOTE(cch): red
 			*pixel++ = rgb[1]; // NOTE(cch): green
 			*pixel++ = rgb[2]; // NOTE(cch): blue

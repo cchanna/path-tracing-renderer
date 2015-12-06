@@ -34,6 +34,7 @@ struct FRAME
 	uint32 color_depth_bytes;
 	uint32 bytes_per_pixel;
 	uint32 delay;
+	float dithering;
 };
 
 struct CAMERA
