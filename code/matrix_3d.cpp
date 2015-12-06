@@ -245,57 +245,57 @@ void Matrix3D_CrossProduct(float res[3], float a[3], float b[3])
 	res[2] = tmp[2];
 }
 
-int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3], float up[3], bool32 use_up)
-{
-	float vector[3];
-	for(int i = 0; i < 3; i++)
-	{
-		vector[i] = coi[i] - eye[i];
-	}
-
-	float length_xz = (float) sqrt(vector[0]*vector[0] + vector[1]*vector[1]);
-	float length = Vector3D_Length(vector);
-
-	if (length_xz == 0 || length == 0) return 0;
-
-	Matrix3D_GetIdentity(view);
-	Matrix3D_GetIdentity(view_inverse);
-	Matrix3D_Translate(view,view_inverse, -eye[0], -eye[1], -eye[2]);
-	if (fabs(vector[1] < length_xz))
-	{
-		Matrix3D_RotateY(view,view_inverse, vector[1]/length_xz, -vector[0]/length_xz);
-		Matrix3D_RotateX(view,view_inverse, length_xz/length, vector[2]/length);
-	}
-	else
-	{
-		Matrix3D_RotateX(view,view_inverse, vector[1]/length_xz, vector[2]/length_xz);
-		Matrix3D_RotateZ(view,view_inverse, length_xz/length, -vector[0]/length);
-	}
-	if (use_up)
-	{
-		float up_tmp[3];
-		float up_tmp_length;
-		// Matrix3D_MultiplyPoint(up_tmp,view,up);
-		up_tmp_length = (float) sqrt(up_tmp[0]*up_tmp[0] + up_tmp[2]*up_tmp[2]);
-
-		if (up_tmp_length == 0) return 0;
-
-		Matrix3D_RotateY(view, view_inverse, up_tmp[2]/up_tmp_length, up_tmp[0]/up_tmp_length);
-	}
-
-	return 1;
-}
-
-int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3], float up[3])
-{
-	return Matrix3D_View(view, view_inverse, eye, coi, up, 1);
-}
-
-int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3])
-{
-	float up[3];
-	up[0] = eye[0];
-	up[1] = eye[1];
-	up[2] = eye[2] + 1.0f;
-	return Matrix3D_View(view, view_inverse, eye, coi, up, 0);
-}
+// int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3], float up[3], bool32 use_up)
+// {
+// 	float vector[3];
+// 	for(int i = 0; i < 3; i++)
+// 	{
+// 		vector[i] = coi[i] - eye[i];
+// 	}
+//
+// 	float length_xz = (float) sqrt(vector[0]*vector[0] + vector[1]*vector[1]);
+// 	// float length = Vector3D_Length(vector);
+//
+// 	if (length_xz == 0 || length == 0) return 0;
+//
+// 	Matrix3D_GetIdentity(view);
+// 	Matrix3D_GetIdentity(view_inverse);
+// 	Matrix3D_Translate(view,view_inverse, -eye[0], -eye[1], -eye[2]);
+// 	if (fabs(vector[1] < length_xz))
+// 	{
+// 		Matrix3D_RotateY(view,view_inverse, vector[1]/length_xz, -vector[0]/length_xz);
+// 		Matrix3D_RotateX(view,view_inverse, length_xz/length, vector[2]/length);
+// 	}
+// 	else
+// 	{
+// 		Matrix3D_RotateX(view,view_inverse, vector[1]/length_xz, vector[2]/length_xz);
+// 		Matrix3D_RotateZ(view,view_inverse, length_xz/length, -vector[0]/length);
+// 	}
+// 	if (use_up)
+// 	{
+// 		float up_tmp[3];
+// 		float up_tmp_length;
+// 		// Matrix3D_MultiplyPoint(up_tmp,view,up);
+// 		up_tmp_length = (float) sqrt(up_tmp[0]*up_tmp[0] + up_tmp[2]*up_tmp[2]);
+//
+// 		if (up_tmp_length == 0) return 0;
+//
+// 		Matrix3D_RotateY(view, view_inverse, up_tmp[2]/up_tmp_length, up_tmp[0]/up_tmp_length);
+// 	}
+//
+// 	return 1;
+// }
+//
+// int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3], float up[3])
+// {
+// 	return Matrix3D_View(view, view_inverse, eye, coi, up, 1);
+// }
+//
+// int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3])
+// {
+// 	float up[3];
+// 	up[0] = eye[0];
+// 	up[1] = eye[1];
+// 	up[2] = eye[2] + 1.0f;
+// 	return Matrix3D_View(view, view_inverse, eye, coi, up, 0);
+// }

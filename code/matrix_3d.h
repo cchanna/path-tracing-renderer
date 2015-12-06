@@ -45,8 +45,8 @@ void Matrix3D_MultiplyVector(VECTOR3D *out, float mtx[4][4], float inv[4][4], VE
 
 
 
-int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3], float up[3]);
-int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3]);
+// int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3], float up[3]);
+// int Matrix3D_View(float view[4][4], float view_inverse[4][4], float eye[3], float coi[3]);
 // TODO(cch): update to use VECTOR3D struct
 // NOTE(cch): construct the view matrix and its inverse given the location of
 // the eye, the center of interest, and an up point.
