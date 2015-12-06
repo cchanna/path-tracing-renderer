@@ -59,9 +59,9 @@ void Matrix3D_Translate(float mtx[4][4], float inv[4][4], float dx, float dy, fl
 	tmp[1][3] = dy;
 	tmp[2][3] = dz;
 	Matrix3D_Multiply(mtx,tmp,mtx);
-	tmp[0][3] = -dz;
+	tmp[0][3] = -dx;
 	tmp[1][3] = -dy;
-	tmp[2][3] = -dx;
+	tmp[2][3] = -dz;
 	Matrix3D_Multiply(inv,inv,tmp);
 }
 
