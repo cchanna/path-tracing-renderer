@@ -30,5 +30,10 @@ void Vector3D_Normalize(VECTOR3D *result, VECTOR3D *vector)
 	result->is_point = vector->is_point;
 }
 
+float Vector3D_DotProduct(VECTOR3D *a, VECTOR3D *b)
+{
+	return a->x*b->x + a->y*b->y + a->z*b->z; 
+}
+
 #define VECTOR_3D_CPP
 #endif
