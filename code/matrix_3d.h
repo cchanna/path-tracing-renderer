@@ -14,7 +14,7 @@ void Matrix3D_GetIdentity(float a[4][4]);
 
 void Matrix3D_Translate(float mtx[4][4], float inv[4][4], float dx, float dy, float dz);
 
-void Matrix3D_Scale(float mtx[4][4], float inv[4][4], float sx, float sy, float sz);
+int Matrix3D_Scale(float mtx[4][4], float inv[4][4], float sx, float sy, float sz);
 
 void Matrix3D_RotateX(float mtx[4][4], float inv[4][4], float cs, float sn);
 void Matrix3D_RotateX(float mtx[4][4], float inv[4][4], float radians);

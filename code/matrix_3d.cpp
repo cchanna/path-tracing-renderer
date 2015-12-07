@@ -9,19 +9,6 @@ void Matrix3D_Copy(float a[4][4], float b[4][4])
 	}
 }
 
-void Matrix3D_Transpose(float out[4][4], float in[4][4])
-{
-	float tmp[4][4];
-	for (int r = 0; r < 4; r++)
-	{
-		for (int c = 0; c < 4; c++)
-		{
-			tmp[c][r] = in[r][c];
-		}
-	}
-	Matrix3D_Copy(out, tmp);
-}
-
 void Matrix3D_Multiply(float res[4][4], float a[4][4], float b[4][4])
 {
 	float tmp[4][4];
@@ -65,9 +52,11 @@ void Matrix3D_Translate(float mtx[4][4], float inv[4][4], float dx, float dy, fl
 	Matrix3D_Multiply(inv,inv,tmp);
 }
 
-void Matrix3D_Scale(float mtx[4][4], float inv[4][4], float sx, float sy, float sz)
+int Matrix3D_Scale(float mtx[4][4], float inv[4][4], float sx, float sy, float sz)
 {
+	if ((sx == 0) || (sy == 0) || (sz == 0)) return 0;
 	float tmp[4][4] = {};
+	Matrix3D_GetIdentity(tmp);
 	tmp[0][0] = sx;
 	tmp[1][1] = sy;
 	tmp[2][2] = sz;
@@ -76,6 +65,7 @@ void Matrix3D_Scale(float mtx[4][4], float inv[4][4], float sx, float sy, float 
 	tmp[1][1] = 1/sy;
 	tmp[2][2] = 1/sz;
 	Matrix3D_Multiply(inv,inv,tmp);
+	return 1;
 }
 
 void Matrix3D_RotateX(float mtx[4][4], float inv[4][4], float cs, float sn)
@@ -185,11 +175,9 @@ void Matrix3D_MultiplyVector(VECTOR3D *out, float mtx[4][4], float inv[4][4], VE
 	}
 	else
 	{
-		float transpose[4][4];
-		Matrix3D_Transpose(transpose,inv);
-		tmp.x = transpose[0][0]*in->x + transpose[0][1]*in->y + transpose[0][2]*in->z + transpose[0][3];
-		tmp.y = transpose[1][0]*in->x + transpose[1][1]*in->y + transpose[1][2]*in->z + transpose[1][3];
-		tmp.z = transpose[2][0]*in->x + transpose[2][1]*in->y + transpose[2][2]*in->z + transpose[2][3];
+		tmp.x = mtx[0][0]*in->x + mtx[1][0]*in->y + mtx[2][0]*in->z + mtx[3][0];
+		tmp.y = mtx[0][1]*in->x + mtx[1][1]*in->y + mtx[2][1]*in->z + mtx[3][1];
+		tmp.z = mtx[0][2]*in->x + mtx[1][2]*in->y + mtx[2][2]*in->z + mtx[3][2];
 	}
 	Vector3D_Copy(out, &tmp);
 }
