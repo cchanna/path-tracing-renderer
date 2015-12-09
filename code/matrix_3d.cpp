@@ -71,6 +71,7 @@ int Matrix3D_Scale(float mtx[4][4], float inv[4][4], float sx, float sy, float s
 void Matrix3D_RotateX(float mtx[4][4], float inv[4][4], float cs, float sn)
 {
 	float tmp[4][4] = {};
+	Matrix3D_GetIdentity(tmp);
 	tmp[1][1] =  cs; tmp[1][2] = -sn;
 	tmp[2][1] =  sn; tmp[2][2] =  cs;
 	Matrix3D_Multiply(mtx,tmp,mtx);
@@ -90,6 +91,7 @@ void Matrix3D_RotateX(float mtx[4][4], float inv[4][4], float radians)
 void Matrix3D_RotateY(float mtx[4][4], float inv[4][4], float cs, float sn)
 {
 	float tmp[4][4] = {};
+	Matrix3D_GetIdentity(tmp);
 	tmp[0][0] =  cs; tmp[0][2] = -sn;
 	tmp[2][0] =  sn; tmp[2][2] =  cs;
 	Matrix3D_Multiply(mtx,tmp,mtx);
@@ -101,14 +103,15 @@ void Matrix3D_RotateY(float mtx[4][4], float inv[4][4], float cs, float sn)
 void Matrix3D_RotateY(float mtx[4][4], float inv[4][4], float radians)
 {
 	float cs, sn;
-	cs = (float) cos(radians);
-	sn = (float) sin(radians);
+	cs = cosf(radians);
+	sn = sinf(radians);
 	Matrix3D_RotateY(mtx,inv,cs,sn);
 }
 
 void Matrix3D_RotateZ(float mtx[4][4], float inv[4][4], float cs, float sn)
 {
 	float tmp[4][4] = {};
+	Matrix3D_GetIdentity(tmp);
 	tmp[0][0] =  cs; tmp[0][1] = -sn;
 	tmp[1][0] =  sn; tmp[1][1] =  cs;
 	Matrix3D_Multiply(mtx,tmp,mtx);
@@ -120,8 +123,8 @@ void Matrix3D_RotateZ(float mtx[4][4], float inv[4][4], float cs, float sn)
 void Matrix3D_RotateZ(float mtx[4][4], float inv[4][4], float radians)
 {
 	float cs, sn;
-	cs = (float) cos(radians);
-	sn = (float) sin(radians);
+	cs = cosf(radians);
+	sn = sinf(radians);
 	Matrix3D_RotateZ(mtx,inv,cs,sn);
 }
 
@@ -175,9 +178,9 @@ void Matrix3D_MultiplyVector(VECTOR3D *out, float mtx[4][4], float inv[4][4], VE
 	}
 	else
 	{
-		tmp.x = mtx[0][0]*in->x + mtx[1][0]*in->y + mtx[2][0]*in->z + mtx[3][0];
-		tmp.y = mtx[0][1]*in->x + mtx[1][1]*in->y + mtx[2][1]*in->z + mtx[3][1];
-		tmp.z = mtx[0][2]*in->x + mtx[1][2]*in->y + mtx[2][2]*in->z + mtx[3][2];
+		tmp.x = inv[0][0]*in->x + inv[1][0]*in->y + inv[2][0]*in->z + inv[3][0];
+		tmp.y = inv[0][1]*in->x + inv[1][1]*in->y + inv[2][1]*in->z + inv[3][1];
+		tmp.z = inv[0][2]*in->x + inv[1][2]*in->y + inv[2][2]*in->z + inv[3][2];
 	}
 	Vector3D_Copy(out, &tmp);
 }
