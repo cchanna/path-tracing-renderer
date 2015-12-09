@@ -50,7 +50,7 @@ int main(int argc, const char* argv[])
 	memory.transient_storage = ((uint8 *)memory_block + memory.permanent_storage_size);
 	const uint8 * output_image = (uint8 *)image;
 	GifWriter writer;
-	test = GifBegin(&writer, "test.gif", frame.width, frame.height, frame.delay);
+	test = GifBegin(&writer, "test.gif", frame.width, frame.height, frame.delay, 8, false);
 	while (GetNextFrame(&memory, &frame))
 	{
 		uint8 *pixel = image;
@@ -72,8 +72,9 @@ int main(int argc, const char* argv[])
 				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
 			}
 		}
-		test = GifWriteFrame(&writer, output_image, frame.width, frame.height, frame.delay);
+		test = GifWriteFrame(&writer, output_image, frame.width, frame.height, frame.delay, 8, false);
 
 	}
+	GifEnd(&writer);
 	return(0);
 }
