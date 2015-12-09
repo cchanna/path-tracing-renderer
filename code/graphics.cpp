@@ -51,8 +51,8 @@ Raytrace(float rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dith
 		}
 		else
 		{
-			float t1 = (float)(-b + sqrt(root))/(2*a);
-			float t2 = (float)(-b - sqrt(root))/(2*a);
+			float t1 = (-b + sqrtf(root))/(2*a);
+			float t2 = (-b - sqrtf(root))/(2*a);
 
 			if ((t1 < 0) && (t2 < 0)) distance_sphere = 0;
 			else if ((t2 < 0) || ((t1 >= 0) && (t1 <= t2)))
@@ -182,8 +182,8 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 			state->num_spheres = 0;
 			camera->half_angle_x = TAU_32/12;
 			camera->half_angle_y = TAU_32/12;
-			camera->height = (float) tan(camera->half_angle_y)*2;
-			camera->width = (float) tan(camera->half_angle_x)*2;
+			camera->height = tanf(camera->half_angle_y)*2;
+			camera->width = tanf(camera->half_angle_x)*2;
 			camera->fore = 0.1f;
 			camera->yon = 500.0f;
 			camera->eye.is_point = TRUE;

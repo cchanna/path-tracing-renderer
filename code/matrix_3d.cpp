@@ -83,8 +83,8 @@ void Matrix3D_RotateX(float mtx[4][4], float inv[4][4], float cs, float sn)
 void Matrix3D_RotateX(float mtx[4][4], float inv[4][4], float radians)
 {
 	float cs, sn;
-	cs = (float) cos(radians);
-	sn = (float) sin(radians);
+	cs = cosf(radians);
+	sn = sinf(radians);
 	Matrix3D_RotateX(mtx,inv,cs,sn);
 }
 
