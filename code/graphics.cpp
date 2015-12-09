@@ -190,7 +190,7 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 	{
 		return FALSE;
 	}
-	else if (state->frame_count > 0)
+	else
 	{
 		LeaveOrbit(moon,sphere);
 		ResetSphere(sphere);
