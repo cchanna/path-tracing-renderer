@@ -22,7 +22,6 @@ as a project at some point.
 - [ ] Colored light
 - [ ] Planes
 - [ ] Multiple light sources
-- [ ] Colored lighting
 - [ ] Reflections
 - [ ] Fresnel
 - [ ] Anti-aliasing
