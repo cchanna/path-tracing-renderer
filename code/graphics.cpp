@@ -15,7 +15,7 @@ InitializeMemory(MEMORY *memory, FRAME *frame)
 	frame->color_depth_bytes = 1;
 	frame->bytes_per_pixel = frame->color_depth_bytes * 4;
 	frame->pitch = frame->bytes_per_pixel * frame->width;
-	frame->delay = 4;
+	frame->delay = 2;
 	frame->dithering = 10.0f;
 }
 
@@ -160,53 +160,55 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 {
 	STATE *state = (STATE *) memory->permanent_storage;
 	CAMERA *camera = &state->camera;
-	uint32 number_of_frames = 150;
-	uint32 frames_to_rotate = 150;
-	SPHERE *sphere;
-	SPHERE *moon;
-	if (!state->is_initialized)
 	{
-		state->frame_count = 0;
-		state->is_initialized = TRUE;
-		state->num_spheres = 0;
-		camera->half_angle_x = TAU_32/12;
-		camera->half_angle_y = TAU_32/12;
-		camera->height = (float) tan(camera->half_angle_y)*2;
-		camera->width = (float) tan(camera->half_angle_x)*2;
-		camera->fore = 0.1f;
-		camera->yon = 500.0f;
-		camera->eye.is_point = TRUE;
-		camera->coi.is_point = TRUE;
-		camera->up.is_point = TRUE;
-		sphere = GetSphere(state);
-		moon = GetSphere(state);
-	}
-	else
-	{
-		sphere = &(state->spheres[0]);
-		moon = &(state->spheres[1]);
-	}
-	if (state->frame_count >= number_of_frames)
-	{
-		return FALSE;
-	}
-	else
-	{
-		LeaveOrbit(moon,sphere);
-		ResetSphere(sphere);
-		Matrix3D_Translate(sphere->mtx,sphere->inv,
-			5.0f*cosf(TAU_32*state->frame_count/frames_to_rotate),
-			5.0f*sinf(TAU_32*state->frame_count/frames_to_rotate) + 10.0f,
-			0.0f
-		);
-		ResetSphere(moon);
-		Matrix3D_Scale(moon->mtx,moon->inv,0.2f,0.2f,0.2f);
-		Matrix3D_Translate(moon->mtx,moon->inv,
-			1.5f*cosf(TAU_32*4.0f*state->frame_count/frames_to_rotate),
-			0.0f,
-			1.5f*sinf(TAU_32*4.0f*state->frame_count/frames_to_rotate)
-		);
-		EnterOrbit(moon,sphere);
+		uint32 number_of_frames = 300;
+		uint32 frames_to_rotate = 300;
+		SPHERE *sphere;
+		SPHERE *moon;
+		if (!state->is_initialized)
+		{
+			state->frame_count = 0;
+			state->is_initialized = TRUE;
+			state->num_spheres = 0;
+			camera->half_angle_x = TAU_32/12;
+			camera->half_angle_y = TAU_32/12;
+			camera->height = (float) tan(camera->half_angle_y)*2;
+			camera->width = (float) tan(camera->half_angle_x)*2;
+			camera->fore = 0.1f;
+			camera->yon = 500.0f;
+			camera->eye.is_point = TRUE;
+			camera->coi.is_point = TRUE;
+			camera->up.is_point = TRUE;
+			sphere = GetSphere(state);
+			moon = GetSphere(state);
+		}
+		else
+		{
+			sphere = &(state->spheres[0]);
+			moon = &(state->spheres[1]);
+		}
+		if (state->frame_count >= number_of_frames)
+		{
+			return FALSE;
+		}
+		else
+		{
+			LeaveOrbit(moon,sphere);
+			ResetSphere(sphere);
+			Matrix3D_Translate(sphere->mtx,sphere->inv,
+				5.0f*cosf(TAU_32*state->frame_count/frames_to_rotate),
+				5.0f*sinf(TAU_32*state->frame_count/frames_to_rotate) + 15.0f,
+				0.0f
+			);
+			ResetSphere(moon);
+			Matrix3D_Scale(moon->mtx,moon->inv,0.2f,0.2f,0.2f);
+			Matrix3D_Translate(moon->mtx,moon->inv,
+				1.5f*cosf(TAU_32*4.0f*state->frame_count/frames_to_rotate),
+				0.0f,
+				1.5f*sinf(TAU_32*4.0f*state->frame_count/frames_to_rotate)
+			);
+			EnterOrbit(moon,sphere);
+		}
 	}
 	uint8 *pixel = (uint8 *) frame->memory;
 	for (uint32 y = 0; y < frame->height; y++)
