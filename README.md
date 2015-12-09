@@ -18,7 +18,8 @@ as a project at some point.
 - [X] Abstracted shapes
 - [X] Shape color
 - [ ] Replace gif_h with something better
-- [ ] Abstracted light (with color)
+- [ ] Abstracted light
+- [ ] Colored light
 - [ ] Planes
 - [ ] Multiple light sources
 - [ ] Colored lighting
