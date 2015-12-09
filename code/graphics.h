@@ -48,9 +48,15 @@ struct CAMERA
 	VECTOR3D eye, coi, up;
 };
 
+struct COLOR
+{
+	float red,green,blue;
+};
+
 struct SPHERE
 {
 	float mtx[4][4], inv[4][4];
+	COLOR color;
 };
 
 struct STATE

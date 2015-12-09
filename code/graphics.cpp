@@ -27,6 +27,7 @@ Raytrace(float rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dith
 	float distance = state->camera.yon;
 	float distance_object = 0;
 	uint32 sphere_num = 0;
+	COLOR color = {};
 	for (uint32 i = 0; i < state->num_spheres; i++)
 	{
 		SPHERE *sphere = &(state->spheres[i]);
@@ -71,6 +72,9 @@ Raytrace(float rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dith
 			Vector3D_Copy(&eye_object,&eye_sphere);
 			Vector3D_Copy(&vector_object,&vector_sphere);
 			sphere_num = i;
+			color.red = sphere->color.red;
+			color.blue = sphere->color.blue;
+			color.green = sphere->color.green;
 		}
 	}
 	VECTOR3D light = {};
@@ -118,9 +122,9 @@ Raytrace(float rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dith
 		if (diffuse < 0.0f) diffuse = 0.0f;
 		if (diffuse > 1.0f) diffuse = 1.0f;
 	}
-	rgb[0] = (diffuse);
-	rgb[1] = (diffuse);
-	rgb[2] = (diffuse);
+	rgb[0] = (diffuse) * color.red;
+	rgb[1] = (diffuse) * color.green;
+	rgb[2] = (diffuse) * color.blue;
 	return distance;
 }
 
@@ -137,6 +141,7 @@ GetSphere(STATE *state)
 	SPHERE *sphere = &(state->spheres[state->num_spheres]);
 	Matrix3D_GetIdentity(sphere->mtx);
 	Matrix3D_GetIdentity(sphere->inv);
+	sphere->color = {};
 	state->num_spheres++;
 	return sphere;
 }
@@ -147,13 +152,13 @@ EnterOrbit(SPHERE *moon, SPHERE *sphere)
 	Matrix3D_Multiply(moon->mtx,sphere->mtx,moon->mtx);
 	Matrix3D_Multiply(moon->inv,moon->inv,sphere->inv);
 }
-
-internal void
-LeaveOrbit(SPHERE *moon, SPHERE *sphere)
-{
-	Matrix3D_Multiply(moon->mtx,sphere->inv,moon->mtx);
-	Matrix3D_Multiply(moon->inv,moon->inv,sphere->mtx);
-}
+//
+// internal void
+// LeaveOrbit(SPHERE *moon, SPHERE *sphere)
+// {
+// 	Matrix3D_Multiply(moon->mtx,sphere->inv,moon->mtx);
+// 	Matrix3D_Multiply(moon->inv,moon->inv,sphere->mtx);
+// }
 
 internal bool32
 GetNextFrame(MEMORY *memory, FRAME *frame)
@@ -161,10 +166,15 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 	STATE *state = (STATE *) memory->permanent_storage;
 	CAMERA *camera = &state->camera;
 	{
-		uint32 number_of_frames = 300;
-		uint32 frames_to_rotate = 300;
+		uint32 number_of_frames = 150;
+		if (state->frame_count >= number_of_frames)
+		{
+			return FALSE;
+		}
+		uint32 frames_to_rotate = 150;
 		SPHERE *sphere;
 		SPHERE *moon;
+		SPHERE *center;
 		if (!state->is_initialized)
 		{
 			state->frame_count = 0;
@@ -180,33 +190,40 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 			camera->coi.is_point = TRUE;
 			camera->up.is_point = TRUE;
 			sphere = GetSphere(state);
+			sphere->color.red = 1.0f;
 			moon = GetSphere(state);
+			moon->color.blue = 1.0f;
+			center = GetSphere(state);
+			center->color.green = 1.0f;
 		}
 		else
 		{
 			sphere = &(state->spheres[0]);
 			moon = &(state->spheres[1]);
+			center = &(state->spheres[2]);
 		}
-		if (state->frame_count >= number_of_frames)
 		{
-			return FALSE;
-		}
-		else
-		{
-			LeaveOrbit(moon,sphere);
+			ResetSphere(center);
+			Matrix3D_Scale(center->mtx,center->inv,3.0f,3.0f,3.0f);
+			Matrix3D_Translate(center->mtx,center->inv,0.0f,15.0f,0.0f);
+
 			ResetSphere(sphere);
+			Matrix3D_Scale(sphere->mtx,sphere->inv,0.5f,0.5f,0.5f);
 			Matrix3D_Translate(sphere->mtx,sphere->inv,
-				5.0f*cosf(TAU_32*state->frame_count/frames_to_rotate),
-				5.0f*sinf(TAU_32*state->frame_count/frames_to_rotate) + 15.0f,
+				2.0f*cosf(TAU_32*state->frame_count/frames_to_rotate),
+				2.0f*sinf(TAU_32*state->frame_count/frames_to_rotate),
 				0.0f
 			);
+			EnterOrbit(sphere,center);
+
 			ResetSphere(moon);
 			Matrix3D_Scale(moon->mtx,moon->inv,0.2f,0.2f,0.2f);
 			Matrix3D_Translate(moon->mtx,moon->inv,
-				1.5f*cosf(TAU_32*4.0f*state->frame_count/frames_to_rotate),
 				0.0f,
-				1.5f*sinf(TAU_32*4.0f*state->frame_count/frames_to_rotate)
+				1.5f*sinf(TAU_32*4.0f*state->frame_count/frames_to_rotate),
+				1.5f*cosf(TAU_32*4.0f*state->frame_count/frames_to_rotate)
 			);
+			Matrix3D_RotateY(moon->mtx,moon->inv,TAU_32*3.0f/16.0f);
 			EnterOrbit(moon,sphere);
 		}
 	}
