@@ -7,14 +7,16 @@ renders as gifs.
 
 I have been rebuilding the original functionality element by element, so I can
 feel more comfortable with the process and hopefully create a more efficient and
-readable implementation.
+readable implementation. The flickering and image quality issues are a result
+of using ginsweater's gif-h -- my next goal is to replace it with something more
+consistent.
 
 - [X] Platform layer
 - [X] Ray-tracing
 - [X] Diffuse lighting
 - [X] Dithering
 - [X] Abstracted shapes
-- [ ] Replace gif_h with more robust gif creation
+- [ ] Replace gif_h with something better
 - [ ] Shape color
 - [ ] Abstracted light (with color)
 - [ ] Planes
