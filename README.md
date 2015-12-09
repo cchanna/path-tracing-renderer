@@ -1,7 +1,7 @@
 #Path-Tracing Renderer
 A project to take the code I wrote for my Advanced Graphics college course
 and re-write it to look more presentable, run on windows, and output completed
-renders as gifs using ginsweater's [gif-h](https://github.com/ginsweater/gif-h.git).
+renders as gifs.
 
 ![Basic shading](http://cchanna.github.io/path-tracing-renderer/test.gif)
 
@@ -13,8 +13,11 @@ readable implementation.
 - [X] Ray-tracing
 - [X] Diffuse lighting
 - [X] Dithering
-- [ ] Abstracted shapes
+- [X] Abstracted shapes
+- [ ] Replace gif_h with more robust gif creation
 - [ ] Shape color
+- [ ] Abstracted light (with color)
+- [ ] Planes
 - [ ] Multiple light sources
 - [ ] Colored lighting
 - [ ] Reflections

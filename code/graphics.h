@@ -43,8 +43,14 @@ struct CAMERA
 	float half_angle_y;
 	float height;
 	float width;
+	float fore;
 	float yon;
 	VECTOR3D eye, coi, up;
+};
+
+struct SPHERE
+{
+	float mtx[4][4], inv[4][4];
 };
 
 struct STATE
@@ -52,6 +58,8 @@ struct STATE
 	bool32 is_initialized;
 	uint32 frame_count;
 	CAMERA camera;
+	SPHERE spheres[5];
+	uint32 num_spheres;
 };
 
 internal void
