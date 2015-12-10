@@ -17,7 +17,7 @@ as a project at some point.
 - [X] Dithering
 - [X] Abstracted shapes
 - [X] Shape color
-- [ ] Replace gif_h with something better
+- [ ] Custom gif-making code
 - [ ] Abstracted light
 - [ ] Colored light
 - [ ] Planes

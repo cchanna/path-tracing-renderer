@@ -20,7 +20,7 @@ InitializeMemory(MEMORY *memory, FRAME *frame)
 }
 
 internal float
-Raytrace(float rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dithering)
+Raytrace(COLOR *result, VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dithering)
 {
 	VECTOR3D eye_object = {};
 	VECTOR3D vector_object = {};
@@ -90,15 +90,15 @@ Raytrace(float rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dith
 		if (sunlight > 0.0f)
 		{
 			sunlight = powf(sunlight, 2.0);
-			rgb[0] = sunlight*0.8f + 1.0f*0.2f;
-			rgb[1] = sunlight*0.8f + 1.0f*0.2f;
-			rgb[2] = sunlight*0.8f + 1.0f*0.2f;
+			result->red = sunlight*0.8f + 1.0f*0.2f;
+			result->green = sunlight*0.8f + 1.0f*0.2f;
+			result->blue = sunlight*0.8f + 1.0f*0.2f;
 		}
 		else
 		{
-			rgb[0] = 1.0f*0.2f;
-			rgb[1] = 1.0f*0.2f;
-			rgb[2] = 1.0f*0.2f;
+			result->red = 1.0f*0.2f;
+			result->green = 1.0f*0.2f;
+			result->blue = 1.0f*0.2f;
 		}
 		return 0;
 	}
@@ -122,9 +122,9 @@ Raytrace(float rgb[3], VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dith
 		if (diffuse < 0.0f) diffuse = 0.0f;
 		if (diffuse > 1.0f) diffuse = 1.0f;
 	}
-	rgb[0] = (diffuse) * color.red;
-	rgb[1] = (diffuse) * color.green;
-	rgb[2] = (diffuse) * color.blue;
+	result->red = (diffuse) * color.red;
+	result->green = (diffuse) * color.green;
+	result->blue = (diffuse) * color.blue;
 	return distance;
 }
 
@@ -237,19 +237,15 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 			vector.y = 1.0f;
 			vector.z = -(y - frame->height/2.0f)*(camera->height / frame->height);
 			Vector3D_Normalize(&vector,&vector);
-			float rgb_f[3] = {};
-			Raytrace(rgb_f,&camera->eye,&vector,state,frame->dithering);
-			if (rgb_f[0] > 1.0f) rgb_f[0] = 1.0f;
-			if (rgb_f[1] > 1.0f) rgb_f[1] = 1.0f;
-			if (rgb_f[2] > 1.0f) rgb_f[2] = 1.0f;
-			uint8 rgb[3];
-			rgb[0] = (uint8)(rgb_f[0] * 255.0f);
-			rgb[1] = (uint8)(rgb_f[1] * 255.0f);
-			rgb[2] = (uint8)(rgb_f[2] * 255.0f);
-			*pixel++ = rgb[0]; // NOTE(cch): red
-			*pixel++ = rgb[1]; // NOTE(cch): green
-			*pixel++ = rgb[2]; // NOTE(cch): blue
-			*pixel++;        // NOTE(cch): unused alpha layer
+			COLOR color = {};
+			Raytrace(&color,&camera->eye,&vector,state,frame->dithering);
+			if (color.red > 1.0f) color.red = 1.0f;
+			if (color.green > 1.0f) color.green = 1.0f;
+			if (color.blue > 1.0f) color.blue = 1.0f;
+			*pixel++ = (uint8)(color.red * 255.0f);
+			*pixel++ = (uint8)(color.green * 255.0f);
+			*pixel++ = (uint8)(color.blue * 255.0f);
+			*pixel++; // NOTE(cch): unused alpha layer
 		}
 	}
 	state->frame_count++;

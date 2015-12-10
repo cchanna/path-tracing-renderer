@@ -30,13 +30,10 @@ int main(int argc, const char* argv[])
 	InitializeMemory(&memory, &frame);
 
 	// NOTE(cch): the goal is for all allocations to be in one place, and held
-	// exclusively in the platform layer. memory leaks become impossible and the
-	// whole thing feels a lot less slapdash this way
+	// exclusively in the platform layer. memory leaks become impossible.
 	int frame_memory_size = frame.width * frame.height * frame.bytes_per_pixel;
 	frame.memory = VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-
-	int image_size = frame.width * frame.height * WIN_BYTES_PER_PIXEL;
-	image = (uint8 *)VirtualAlloc(0, image_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	image = (uint8 *)VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 #if GRAPHICS_INTERNAL
 	LPVOID base_address = 0;
@@ -54,10 +51,7 @@ int main(int argc, const char* argv[])
 	while (GetNextFrame(&memory, &frame))
 	{
 		uint8 *pixel = image;
-		uint8 *source_pixel = (uint8 *)(((uint64)frame.memory) + frame.color_depth_bytes - 1);
-		// NOTE(cch): tricky conversions to allow for a greater color depth
-		// in the renderer than in the output gif, and to accomodate for
-		// little-endian memory
+		uint8 *source_pixel = (uint8 *) frame.memory;
 		for (uint64 y = 0; y < frame.height; y++)
 		{
 			for(uint64 x = 0; x < frame.width; x++)
