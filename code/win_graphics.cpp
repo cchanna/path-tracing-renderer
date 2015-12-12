@@ -25,15 +25,15 @@ int main(int argc, const char* argv[])
 
 	MEMORY memory = {};
 	FRAME frame = {};
-	uint8 * image = {};
-
-	InitializeMemory(&memory, &frame);
+	uint8 * video = {};
+	int frame_count = InitializeMemory(&memory, &frame);
 
 	// NOTE(cch): the goal is for all allocations to be in one place, and held
 	// exclusively in the platform layer. memory leaks become impossible.
 	int frame_memory_size = frame.width * frame.height * frame.bytes_per_pixel;
 	frame.memory = VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-	image = (uint8 *)VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	int video_memory_size = frame_memory_size * frame_count;
+	video = (uint8 *)VirtualAlloc(0, video_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 #if GRAPHICS_INTERNAL
 	LPVOID base_address = 0;
@@ -45,12 +45,11 @@ int main(int argc, const char* argv[])
 	void * memory_block = VirtualAlloc(base_address, (size_t)total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	memory.permanent_storage = memory_block;
 	memory.transient_storage = ((uint8 *)memory_block + memory.permanent_storage_size);
-	const uint8 * output_image = (uint8 *)image;
 	GifWriter writer;
-	test = GifBegin(&writer, "test.gif", frame.width, frame.height, frame.delay, 8, false);
-	while (GetNextFrame(&memory, &frame))
+	uint8 *pixel = video;
+	for (int i = 0; i < frame_count; i++)
 	{
-		uint8 *pixel = image;
+		GetNextFrame(&memory, &frame, i);
 		uint8 *source_pixel = (uint8 *) frame.memory;
 		for (uint64 y = 0; y < frame.height; y++)
 		{
@@ -66,8 +65,12 @@ int main(int argc, const char* argv[])
 				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
 			}
 		}
+	}
+	test = GifBegin(&writer, "test.gif", frame.width, frame.height, frame.delay, 8, false);
+	for (int i = 0; i < frame_count; i++)
+	{
+		const uint8 * output_image = (uint8 *)video + (frame_memory_size * i);
 		test = GifWriteFrame(&writer, output_image, frame.width, frame.height, frame.delay, 8, false);
-
 	}
 	GifEnd(&writer);
 	return(0);

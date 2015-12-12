@@ -1,6 +1,8 @@
 // NOTE(cch): where the magic happens
 
-internal void
+#define FRAME_COUNT 150
+
+internal int
 InitializeMemory(MEMORY *memory, FRAME *frame)
 {
 	*memory = {};
@@ -17,6 +19,8 @@ InitializeMemory(MEMORY *memory, FRAME *frame)
 	frame->pitch = frame->bytes_per_pixel * frame->width;
 	frame->delay = 2;
 	frame->dithering = 10.0f;
+
+	return FRAME_COUNT;
 }
 
 internal float
@@ -160,18 +164,13 @@ EnterOrbit(SPHERE *moon, SPHERE *sphere)
 // 	Matrix3D_Multiply(moon->inv,moon->inv,sphere->mtx);
 // }
 
-internal bool32
-GetNextFrame(MEMORY *memory, FRAME *frame)
+internal void
+GetNextFrame(MEMORY *memory, FRAME *frame, uint32 frame_number)
 {
 	STATE *state = (STATE *) memory->permanent_storage;
 	CAMERA *camera = &state->camera;
 	{
-		uint32 number_of_frames = 150;
-		if (state->frame_count >= number_of_frames)
-		{
-			return FALSE;
-		}
-		uint32 frames_to_rotate = 150;
+		uint32 frames_to_rotate = FRAME_COUNT;
 		SPHERE *sphere;
 		SPHERE *moon;
 		SPHERE *center;
@@ -210,8 +209,8 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 			ResetSphere(sphere);
 			Matrix3D_Scale(sphere->mtx,sphere->inv,0.5f,0.5f,0.5f);
 			Matrix3D_Translate(sphere->mtx,sphere->inv,
-				2.0f*cosf(TAU_32*state->frame_count/frames_to_rotate),
-				2.0f*sinf(TAU_32*state->frame_count/frames_to_rotate),
+				2.0f*cosf(TAU_32*frame_number/frames_to_rotate),
+				2.0f*sinf(TAU_32*frame_number/frames_to_rotate),
 				0.0f
 			);
 			EnterOrbit(sphere,center);
@@ -220,8 +219,8 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 			Matrix3D_Scale(moon->mtx,moon->inv,0.2f,0.2f,0.2f);
 			Matrix3D_Translate(moon->mtx,moon->inv,
 				0.0f,
-				1.5f*sinf(TAU_32*4.0f*state->frame_count/frames_to_rotate),
-				1.5f*cosf(TAU_32*4.0f*state->frame_count/frames_to_rotate)
+				1.5f*sinf(TAU_32*4.0f*frame_number/frames_to_rotate),
+				1.5f*cosf(TAU_32*4.0f*frame_number/frames_to_rotate)
 			);
 			Matrix3D_RotateY(moon->mtx,moon->inv,TAU_32*3.0f/16.0f);
 			EnterOrbit(moon,sphere);
@@ -249,5 +248,4 @@ GetNextFrame(MEMORY *memory, FRAME *frame)
 		}
 	}
 	state->frame_count++;
-	return TRUE;
 }

@@ -68,7 +68,7 @@ struct STATE
 	uint32 num_spheres;
 };
 
-internal void
+internal int
 Initialize(MEMORY *memory, FRAME *frame);
 // NOTE(cch): this sets up the MEMORY and FRAME structs so that the platform
 // layer can know how much memory needs to be allocated for them. this way you
@@ -76,8 +76,8 @@ Initialize(MEMORY *memory, FRAME *frame);
 // NOTE(cch): i guess this is a constructor? except without all the baggage that
 // might come with that term
 
-internal bool32
-GetNextFrame(MEMORY *memory, FRAME *frame);
+internal void
+GetNextFrame(MEMORY *memory, FRAME *frame, uint32 frame_number);
 
 #define GRAPHICS_H
 #endif
