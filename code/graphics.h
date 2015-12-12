@@ -28,12 +28,12 @@ struct MEMORY
 struct FRAME
 {
 	void *memory;
-    uint32 width;
-    uint32 height;
-    uint32 pitch;
-	uint32 color_depth_bytes;
-	uint32 bytes_per_pixel;
-	uint32 delay;
+    uint16 width;
+    uint16 height;
+	uint16 delay;
+	uint16 color_depth_bytes;
+	uint16 bytes_per_pixel;
+	uint32 pitch;
 	float dithering;
 };
 

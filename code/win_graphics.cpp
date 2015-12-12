@@ -19,6 +19,28 @@ typedef uint64_t uint64;
 #include "graphics.h"
 #include "graphics.cpp"
 
+internal void
+Win_Write8(WIN_GIF_WRITER *writer, uint8 byte)
+{
+	*(writer->cursor++) = byte;
+}
+
+internal void
+Win_Write16(WIN_GIF_WRITER *writer, uint16 value)
+{
+	*(writer->cursor++) = (uint8) value;
+	*(writer->cursor++) = (uint8) (value >> 8);
+}
+
+internal void
+Win_WriteString(WIN_GIF_WRITER *writer, char *string)
+{
+	while(*string)
+	{
+		*(writer->cursor++) = *(string++);
+	}
+}
+
 int main(int argc, const char* argv[])
 {
 	bool test = FALSE;
@@ -45,7 +67,6 @@ int main(int argc, const char* argv[])
 	void * memory_block = VirtualAlloc(base_address, (size_t)total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	memory.permanent_storage = memory_block;
 	memory.transient_storage = ((uint8 *)memory_block + memory.permanent_storage_size);
-	GifWriter writer;
 	uint8 *pixel = video;
 	for (int i = 0; i < frame_count; i++)
 	{
@@ -66,12 +87,127 @@ int main(int argc, const char* argv[])
 			}
 		}
 	}
-	test = GifBegin(&writer, "test.gif", frame.width, frame.height, frame.delay, 8, false);
+
+
+	LPCVOID *buffer = (LPCVOID *) memory.permanent_storage;
+	WIN_GIF_WRITER w = {};
+	w.cursor = (uint8 *) buffer;
+	w.location = w.cursor;
+	// NOTE(cch): header
+	Win_WriteString(&w,"GIF89a");
+
+	// NOTE(cch): logical screen descriptor
+	Win_Write16(&w,frame.width);
+	Win_Write16(&w,frame.height);
+	Win_Write8(&w,(1 << 7) | (1 << 4) | COLOR_TABLE_SIZE_COMPRESSED);
+	Win_Write8(&w,0x00); // NOTE(cch): background color index
+	Win_Write8(&w,0x00); // NOTE(cch): pixel aspect ratio
+
+	// NOTE(cch): global color table&
+	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
+	color_table[0] = {0xFF,0xFF,0xFF};
+	color_table[1] = {0xFF,0x00,0x00};
+	color_table[2] = {0x00,0x00,0xFF};
+	color_table[3] = {0x00,0x00,0x00};
+	for (int i = 0; i < COLOR_TABLE_SIZE; i++)
+	{
+		Win_Write8(&w,color_table[i].red);
+		Win_Write8(&w,color_table[i].green);
+		Win_Write8(&w,color_table[i].blue);
+	}
+
+	// NOTE(cch): graphics control extension
+	Win_Write8(&w,0x21); // NOTE(cch): background color index
+	Win_Write8(&w,0xF9);
+	Win_Write8(&w,0x04);
+	Win_Write8(&w,0x00);
+	Win_Write16(&w,frame.delay);
+	Win_Write8(&w,0x00);
+	Win_Write8(&w,0x00);
+
+	// NOTE(cch): image descriptors
+	uint8 example_image[100] = {
+		1,1,1,1,1,2,2,2,2,2,
+		1,1,1,1,1,2,2,2,2,2,
+		1,1,1,1,1,2,2,2,2,2,
+		1,1,1,0,0,0,0,2,2,2,
+		1,1,1,0,0,0,0,2,2,2,
+		2,2,2,0,0,0,0,1,1,1,
+		2,2,2,0,0,0,0,1,1,1,
+		2,2,2,2,2,1,1,1,1,1,
+		2,2,2,2,2,1,1,1,1,1,
+		2,2,2,2,2,1,1,1,1,1,
+	};
 	for (int i = 0; i < frame_count; i++)
 	{
-		const uint8 * output_image = (uint8 *)video + (frame_memory_size * i);
-		test = GifWriteFrame(&writer, output_image, frame.width, frame.height, frame.delay, 8, false);
+		Win_Write8(&w,0x2C);
+		Win_Write16(&w,0); // NOTE(cch): image left
+		Win_Write16(&w,0); // NOTE(cch): image top
+		Win_Write16(&w,10); // NOTE(cch): image width
+		Win_Write16(&w,10); // NOTE(cch): image height
+		Win_Write8(&w,0x00);
+		// NOTE(cch): image data
+		Win_Write8(&w,0x02);
+
+		int32 code_table[4096];
+		int code_cursor = 0;
+		uint8 color = 0;
+		for (color = 0; color < COLOR_TABLE_SIZE; color++ )
+		{
+			code_table[code_cursor++] = color;
+		}
+		code_cursor += 2;
+		Win_Write8(&w,0x16);
+		Win_Write8(&w,0x8C);
+		Win_Write8(&w,0x2D);
+		Win_Write8(&w,0x99);
+		Win_Write8(&w,0x87);
+		Win_Write8(&w,0x2A);
+		Win_Write8(&w,0x1C);
+		Win_Write8(&w,0xDC);
+		Win_Write8(&w,0x33);
+		Win_Write8(&w,0xA0);
+		Win_Write8(&w,0x02);
+		Win_Write8(&w,0x75);
+		Win_Write8(&w,0xEC);
+		Win_Write8(&w,0x95);
+		Win_Write8(&w,0xFA);
+		Win_Write8(&w,0xA8);
+		Win_Write8(&w,0xDE);
+		Win_Write8(&w,0x60);
+		Win_Write8(&w,0x8C);
+		Win_Write8(&w,0x04);
+		Win_Write8(&w,0x91);
+		Win_Write8(&w,0x4C);
+		Win_Write8(&w,0x01);
+
+		Win_Write8(&w,0x00);
 	}
-	GifEnd(&writer);
+
+	// NOTE(cch): trailer
+	Win_Write8(&w,0x3B);
+
+	DWORD bytes_to_write = (DWORD)(w.cursor - w.location);
+	HANDLE file_handle = CreateFileA("test.gif", GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
+
+	if (file_handle != INVALID_HANDLE_VALUE) {
+		DWORD bytes_written;
+		bool32 result;
+		// NOTE: File read successfully
+		if(WriteFile(file_handle, buffer, bytes_to_write, &bytes_written, NULL))
+		{
+			result = (bytes_written == bytes_to_write);
+		}
+		else
+		{
+			// TODO: logging
+		}
+		CloseHandle(file_handle);
+	}
+	else
+	{
+		// TODO: logging
+	}
+
 	return(0);
 }

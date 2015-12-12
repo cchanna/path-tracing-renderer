@@ -1,6 +1,6 @@
 // NOTE(cch): where the magic happens
 
-#define FRAME_COUNT 150
+#define FRAME_COUNT 1
 
 internal int
 InitializeMemory(MEMORY *memory, FRAME *frame)
@@ -12,8 +12,8 @@ InitializeMemory(MEMORY *memory, FRAME *frame)
 	memory->transient_storage_size = Kilobytes(1);
 
 
-	frame->width = 500;
-	frame->height = 500;
+	frame->width = 10;
+	frame->height = 10;
 	frame->color_depth_bytes = 1;
 	frame->bytes_per_pixel = frame->color_depth_bytes * 4;
 	frame->pitch = frame->bytes_per_pixel * frame->width;
