@@ -10,7 +10,7 @@ void Vector3D_Copy(VECTOR3D *a, VECTOR3D *b)
 
 float Vector3D_Length(VECTOR3D *vector)
 {
-	return (float) sqrt(vector->x*vector->x + vector->y*vector->y + vector->z*vector->z);
+	return sqrtf(vector->x*vector->x + vector->y*vector->y + vector->z*vector->z);
 }
 
 void Vector3D_GetVectorFromPoints(VECTOR3D *result, VECTOR3D *origin, VECTOR3D *direction)
@@ -28,6 +28,11 @@ void Vector3D_Normalize(VECTOR3D *result, VECTOR3D *vector)
 	result->y = vector->y/length;
 	result->z = vector->z/length;
 	result->is_point = vector->is_point;
+}
+
+float Vector3D_DotProduct(VECTOR3D *a, VECTOR3D *b)
+{
+	return a->x*b->x + a->y*b->y + a->z*b->z;
 }
 
 #define VECTOR_3D_CPP

@@ -34,6 +34,7 @@ struct FRAME
 	uint32 color_depth_bytes;
 	uint32 bytes_per_pixel;
 	uint32 delay;
+	float dithering;
 };
 
 struct CAMERA
@@ -42,8 +43,20 @@ struct CAMERA
 	float half_angle_y;
 	float height;
 	float width;
+	float fore;
 	float yon;
 	VECTOR3D eye, coi, up;
+};
+
+struct COLOR
+{
+	float red,green,blue;
+};
+
+struct SPHERE
+{
+	float mtx[4][4], inv[4][4];
+	COLOR color;
 };
 
 struct STATE
@@ -51,9 +64,11 @@ struct STATE
 	bool32 is_initialized;
 	uint32 frame_count;
 	CAMERA camera;
+	SPHERE spheres[5];
+	uint32 num_spheres;
 };
 
-internal void
+internal int
 Initialize(MEMORY *memory, FRAME *frame);
 // NOTE(cch): this sets up the MEMORY and FRAME structs so that the platform
 // layer can know how much memory needs to be allocated for them. this way you
@@ -61,8 +76,8 @@ Initialize(MEMORY *memory, FRAME *frame);
 // NOTE(cch): i guess this is a constructor? except without all the baggage that
 // might come with that term
 
-internal bool32
-GetNextFrame(MEMORY *memory, FRAME *frame);
+internal void
+GetNextFrame(MEMORY *memory, FRAME *frame, uint32 frame_number);
 
 #define GRAPHICS_H
 #endif
