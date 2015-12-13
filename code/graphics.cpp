@@ -32,6 +32,7 @@ Raytrace(COLOR *result, VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dit
 	float distance_object = 0;
 	uint32 sphere_num = 0;
 	COLOR color = {};
+	COLOR sky = {0.0f, 0.1f,0.25f};
 	for (uint32 i = 0; i < state->num_spheres; i++)
 	{
 		SPHERE *sphere = &(state->spheres[i]);
@@ -94,15 +95,15 @@ Raytrace(COLOR *result, VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dit
 		if (sunlight > 0.0f)
 		{
 			sunlight = powf(sunlight, 2.0);
-			result->red = sunlight*0.8f + 1.0f*0.2f;
-			result->green = sunlight*0.8f + 1.0f*0.2f;
-			result->blue = sunlight*0.8f + 1.0f*0.2f;
+			result->red = sunlight*0.8f + sky.red;
+			result->green = sunlight*0.2f + sky.green;
+			result->blue = sunlight*0.75f + sky.blue;
 		}
 		else
 		{
-			result->red = 1.0f*0.2f;
-			result->green = 1.0f*0.2f;
-			result->blue = 1.0f*0.2f;
+			result->red = sky.red;
+			result->green = sky.green;
+			result->blue = sky.blue;
 		}
 		return 0;
 	}
@@ -126,9 +127,9 @@ Raytrace(COLOR *result, VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dit
 		if (diffuse < 0.0f) diffuse = 0.0f;
 		if (diffuse > 1.0f) diffuse = 1.0f;
 	}
-	result->red = (diffuse) * color.red;
-	result->green = (diffuse) * color.green;
-	result->blue = (diffuse) * color.blue;
+	result->red   = (diffuse * color.red   * 0.75f) + (sky.red   * 0.25f);
+	result->green = (diffuse * color.green * 0.75f) + (sky.green * 0.25f);
+	result->blue  = (diffuse * color.blue  * 0.75f) + (sky.blue  * 0.25f);
 	return distance;
 }
 
@@ -190,10 +191,16 @@ GetNextFrame(MEMORY *memory, FRAME *frame, uint32 frame_number)
 			camera->up.is_point = TRUE;
 			sphere = GetSphere(state);
 			sphere->color.red = 1.0f;
+			sphere->color.green = 0.35f;
+			sphere->color.blue = 0.65f;
 			moon = GetSphere(state);
-			moon->color.blue = 1.0f;
+			moon->color.red = 0.8f;
+			moon->color.green = 1.0f;
+			moon->color.blue = 0.8f;
 			center = GetSphere(state);
-			center->color.green = 1.0f;
+			center->color.red = 0.87f;
+			center->color.green = 0.10f;
+			center->color.blue = 0.15f;
 		}
 		else
 		{
