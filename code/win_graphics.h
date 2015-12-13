@@ -14,6 +14,11 @@ struct WIN_GIF_WRITER
 	uint8 * cursor;
 };
 
+struct WIN_CODE_TREE
+{
+	uint16 tree[4096][256];
+};
+
 struct WIN_COLOR
 {
 	uint8 red, green, blue;

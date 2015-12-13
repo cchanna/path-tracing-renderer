@@ -67,6 +67,9 @@ int main(int argc, const char* argv[])
 	void * memory_block = VirtualAlloc(base_address, (size_t)total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	memory.permanent_storage = memory_block;
 	memory.transient_storage = ((uint8 *)memory_block + memory.permanent_storage_size);
+
+	WIN_CODE_TREE *code_tree = (WIN_CODE_TREE *) VirtualAlloc(0, sizeof(WIN_CODE_TREE),MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+
 	uint8 *pixel = video;
 	for (int i = 0; i < frame_count; i++)
 	{
@@ -87,11 +90,9 @@ int main(int argc, const char* argv[])
 			}
 		}
 	}
-
-
-	LPCVOID *buffer = (LPCVOID *) memory.permanent_storage;
+	// uint16 *code_tree[256] = (uint16 **) memory.permanent_storage;
 	WIN_GIF_WRITER w = {};
-	w.cursor = (uint8 *) buffer;
+	w.cursor = (uint8 *) memory.permanent_storage;
 	w.location = w.cursor;
 	// NOTE(cch): header
 	Win_WriteString(&w,"GIF89a");
@@ -125,7 +126,6 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0x00);
 	Win_Write8(&w,0x00);
 
-	// NOTE(cch): image descriptors
 	uint8 example_image[100] = {
 		1,1,1,1,1,2,2,2,2,2,
 		1,1,1,1,1,2,2,2,2,2,
@@ -140,24 +140,28 @@ int main(int argc, const char* argv[])
 	};
 	for (int i = 0; i < frame_count; i++)
 	{
+		// NOTE(cch): image descriptor
 		Win_Write8(&w,0x2C);
-		Win_Write16(&w,0); // NOTE(cch): image left
-		Win_Write16(&w,0); // NOTE(cch): image top
-		Win_Write16(&w,10); // NOTE(cch): image width
-		Win_Write16(&w,10); // NOTE(cch): image height
-		Win_Write8(&w,0x00);
-		// NOTE(cch): image data
-		Win_Write8(&w,0x02);
+		Win_Write16(&w,0);   // NOTE(cch): image left
+		Win_Write16(&w,0);   // NOTE(cch): image top
+		Win_Write16(&w,10);  // NOTE(cch): image width
+		Win_Write16(&w,10);  // NOTE(cch): image height
+		Win_Write8(&w,0x00); // NOTE(cch): block terminator
 
-		int32 code_table[4096];
+		// NOTE(cch): image data
+		uint8 lzw_minimum_code_size = COLOR_TABLE_SIZE_COMPRESSED + 1;
+		Win_Write8(&w,lzw_minimum_code_size);
+
 		int code_cursor = 0;
 		uint8 color = 0;
 		for (color = 0; color < COLOR_TABLE_SIZE; color++ )
 		{
-			code_table[code_cursor++] = color;
+			code_tree->tree[code_cursor++][0];
 		}
 		code_cursor += 2;
-		Win_Write8(&w,0x16);
+
+		Win_Write8(&w,0x16); // NOTE(cch): sub-block size
+
 		Win_Write8(&w,0x8C);
 		Win_Write8(&w,0x2D);
 		Win_Write8(&w,0x99);
@@ -181,7 +185,7 @@ int main(int argc, const char* argv[])
 		Win_Write8(&w,0x4C);
 		Win_Write8(&w,0x01);
 
-		Win_Write8(&w,0x00);
+		Win_Write8(&w,0x00); //NOTE(cch): block terminator
 	}
 
 	// NOTE(cch): trailer
@@ -194,6 +198,7 @@ int main(int argc, const char* argv[])
 		DWORD bytes_written;
 		bool32 result;
 		// NOTE: File read successfully
+		LPCVOID *buffer = (LPCVOID *) w.location;
 		if(WriteFile(file_handle, buffer, bytes_to_write, &bytes_written, NULL))
 		{
 			result = (bytes_written == bytes_to_write);
