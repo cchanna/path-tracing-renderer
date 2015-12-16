@@ -1,7 +1,8 @@
 // NOTE(cch): platform-specific code for the renderer
 
-#include "libraries/gif.h"
 #include <windows.h>
+#include <stdio.h>
+#include <stdint.h>
 
 typedef int8_t int8;
 typedef int16_t int16;
@@ -22,14 +23,14 @@ typedef uint64_t uint64;
 internal void
 Win_Write8(WIN_GIF_WRITER *writer, uint8 byte)
 {
-	*(writer->cursor++) = byte;
+	fputc(byte, writer->file);
 }
 
 internal void
 Win_Write16(WIN_GIF_WRITER *writer, uint16 value)
 {
-	*(writer->cursor++) = (uint8) value;
-	*(writer->cursor++) = (uint8) (value >> 8);
+	fputc((uint8) value, writer->file);
+	fputc((uint8) (value >> 8), writer->file);
 }
 
 internal void
@@ -37,21 +38,20 @@ Win_WriteString(WIN_GIF_WRITER *writer, char *string)
 {
 	while(*string)
 	{
-		*(writer->cursor++) = *(string++);
+		fputc(*(string++),writer->file);
 	}
 }
 
 int main(int argc, const char* argv[])
 {
-	bool test = FALSE;
-
 	MEMORY memory = {};
 	FRAME frame = {};
 	uint8 * video = {};
 	int frame_count = InitializeMemory(&memory, &frame);
 
-	// NOTE(cch): the goal is for all allocations to be in one place, and held
-	// exclusively in the platform layer. memory leaks become impossible.
+	// NOTE(cch): the goal is for all allocations to be held exclusively in the
+	// platform layer. this way it's easier to keep track of where it's
+	// happening and is easily portable
 	int frame_memory_size = frame.width * frame.height * frame.bytes_per_pixel;
 	frame.memory = VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	int video_memory_size = frame_memory_size * frame_count;
@@ -68,8 +68,7 @@ int main(int argc, const char* argv[])
 	memory.permanent_storage = memory_block;
 	memory.transient_storage = ((uint8 *)memory_block + memory.permanent_storage_size);
 
-	WIN_CODE_TREE *code_tree = (WIN_CODE_TREE *) VirtualAlloc(0, sizeof(WIN_CODE_TREE),MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-
+	// NOTE(cch): the actual rendering, saved into a single massive video data block
 	uint8 *pixel = video;
 	for (int i = 0; i < frame_count; i++)
 	{
@@ -90,10 +89,28 @@ int main(int argc, const char* argv[])
 			}
 		}
 	}
-	// uint16 *code_tree[256] = (uint16 **) memory.permanent_storage;
+	VirtualFree(frame.memory,0,MEM_RELEASE);
+	VirtualFree(memory_block,0,MEM_RELEASE);
+
+
+////////////////////////////////////////////////////////////////////////////////
+	// making a gif //
+////////////////////////////////////////////////////////////////////////////////
+
+
+	WIN_CODE_TABLE_NODE *code_table = (WIN_CODE_TABLE_NODE *) VirtualAlloc(0, sizeof(WIN_CODE_TABLE_NODE) * 4096,MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	uint16 *code_stream = (uint16 *) VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	// NOTE(cch): the size of a frame should be enough for the code stream,
+	// seeing how it's a compression algorithm and thus should produce something
+	// smaller
 	WIN_GIF_WRITER w = {};
-	w.cursor = (uint8 *) memory.permanent_storage;
-	w.location = w.cursor;
+	w.file = 0;
+	fopen_s(&(w.file), "test.gif", "wb");
+	if (w.file == 0)
+	{
+		return 1;
+	}
+
 	// NOTE(cch): header
 	Win_WriteString(&w,"GIF89a");
 
@@ -104,7 +121,7 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0x00); // NOTE(cch): background color index
 	Win_Write8(&w,0x00); // NOTE(cch): pixel aspect ratio
 
-	// NOTE(cch): global color table&
+	// NOTE(cch): global color table
 	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
 	color_table[0] = {0xFF,0xFF,0xFF};
 	color_table[1] = {0xFF,0x00,0x00};
@@ -138,7 +155,7 @@ int main(int argc, const char* argv[])
 		2,2,2,2,2,1,1,1,1,1,
 		2,2,2,2,2,1,1,1,1,1,
 	};
-	for (int i = 0; i < frame_count; i++)
+	for (int current_frame = 0; current_frame < frame_count; current_frame++)
 	{
 		// NOTE(cch): image descriptor
 		Win_Write8(&w,0x2C);
@@ -152,13 +169,70 @@ int main(int argc, const char* argv[])
 		uint8 lzw_minimum_code_size = COLOR_TABLE_SIZE_COMPRESSED + 1;
 		Win_Write8(&w,lzw_minimum_code_size);
 
-		int code_cursor = 0;
-		uint8 color = 0;
-		for (color = 0; color < COLOR_TABLE_SIZE; color++ )
+		// NOTE(cch): creating the code stream
+		uint16 table_position = COLOR_TABLE_SIZE; // NOTE(cch): the code table
+		uint16 clear_code = table_position++;
+		uint16 end_of_information_code = table_position++;
+		int code_stream_length = 0;
+		code_stream[code_stream_length] = clear_code;
+		int i = 0;
+		while (i < (frame.width * frame.height))
 		{
-			code_tree->tree[code_cursor++][0];
+			uint16 index_buffer[256] = {};
+			uint16 index_buffer_length = 0;
+			index_buffer[index_buffer_length++] = example_image[i++];
+			int code_table_size = 0;
+
+			uint16 previous_code = index_buffer[0];
+			while (i < (frame.width * frame.height))
+			{
+				index_buffer[index_buffer_length++] = example_image[i++];
+				int index = 0;
+				for (uint16 code = 0; code < code_table_size; code++)
+				{
+					index = 0;
+					if (index_buffer_length == code_table[code].length)
+					{
+						while ((index < index_buffer_length) && (index_buffer[index] == code_table[code].values[index]))
+						{
+							index++;
+						}
+						if (index == index_buffer_length)
+						{
+							previous_code = code + table_position;
+							break;
+						}
+					}
+				}
+				if (index != index_buffer_length)
+				{
+					for (int index = 0; index < index_buffer_length; index++)
+					{
+						code_table[code_table_size].values[index] = index_buffer[index];
+					}
+					code_table[code_table_size].length = index_buffer_length;
+					code_table_size++;
+					code_stream[code_stream_length++] = previous_code;
+					index_buffer[0] = index_buffer[index_buffer_length - 1];
+					for (int index = 1; index < index_buffer_length; index++)
+					{
+						index_buffer[index] = 0;
+					}
+					index_buffer_length = 1;
+					previous_code = index_buffer[0];
+
+					// NOTE(cch): if the code table reaches the maximum size, we
+					// start fresh with a new table
+					if (code_table_size == 4096)
+					{
+						break;
+					}
+				}
+			}
+			code_stream[code_stream_length++] = previous_code;
 		}
-		code_cursor += 2;
+		code_stream[code_stream_length++] = end_of_information_code;
+		VirtualFree(code_table,0,MEM_RELEASE);
 
 		Win_Write8(&w,0x16); // NOTE(cch): sub-block size
 
@@ -191,28 +265,7 @@ int main(int argc, const char* argv[])
 	// NOTE(cch): trailer
 	Win_Write8(&w,0x3B);
 
-	DWORD bytes_to_write = (DWORD)(w.cursor - w.location);
-	HANDLE file_handle = CreateFileA("test.gif", GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
-
-	if (file_handle != INVALID_HANDLE_VALUE) {
-		DWORD bytes_written;
-		bool32 result;
-		// NOTE: File read successfully
-		LPCVOID *buffer = (LPCVOID *) w.location;
-		if(WriteFile(file_handle, buffer, bytes_to_write, &bytes_written, NULL))
-		{
-			result = (bytes_written == bytes_to_write);
-		}
-		else
-		{
-			// TODO: logging
-		}
-		CloseHandle(file_handle);
-	}
-	else
-	{
-		// TODO: logging
-	}
+    fclose(w.file);
 
 	return(0);
 }
