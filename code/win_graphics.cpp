@@ -127,10 +127,6 @@ int main(int argc, const char* argv[])
 
 
 	WIN_CODE_TABLE_NODE *code_table = (WIN_CODE_TABLE_NODE *) VirtualAlloc(0, sizeof(WIN_CODE_TABLE_NODE) * 4096,MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-	uint16 *code_stream = (uint16 *) VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-	// NOTE(cch): the size of a frame should be enough for the code stream,
-	// seeing how it's a compression algorithm and thus should produce something
-	// smaller
 	WIN_GIF_WRITER w = {};
 	w.file = 0;
 	fopen_s(&(w.file), "test.gif", "wb");
@@ -184,6 +180,7 @@ int main(int argc, const char* argv[])
 		2,2,2,2,2,1,1,1,1,1,
 		2,2,2,2,2,1,1,1,1,1,
 	};
+
 	for (int current_frame = 0; current_frame < frame_count; current_frame++)
 	{
 		// NOTE(cch): image descriptor
@@ -198,15 +195,12 @@ int main(int argc, const char* argv[])
 		uint8 lzw_minimum_code_size = COLOR_TABLE_SIZE_COMPRESSED + 1;
 		Win_Write8(&w,lzw_minimum_code_size);
 
-
 		uint8 current_code_size = lzw_minimum_code_size + 1;
 
 		// NOTE(cch): creating the code stream
 		uint16 table_position = COLOR_TABLE_SIZE; // NOTE(cch): the code table
 		uint16 clear_code = table_position++;
 		uint16 end_of_information_code = table_position++;
-		int code_stream_length = 0;
-		code_stream[code_stream_length] = clear_code;
 		Win_WriteCode(&w, clear_code, current_code_size);
 		int i = 0;
 		while (i < (frame.width * frame.height))
@@ -239,7 +233,6 @@ int main(int argc, const char* argv[])
 				}
 				if (index != index_buffer_length)
 				{
-					code_stream[code_stream_length++] = previous_code;
 					Win_WriteCode(&w, previous_code, current_code_size);
 
 					for (int index = 0; index < index_buffer_length; index++)
@@ -252,7 +245,6 @@ int main(int argc, const char* argv[])
 						current_code_size++;
 					}
 					code_table_size++;
-
 
 					index_buffer[0] = index_buffer[index_buffer_length - 1];
 					for (int index = 1; index < index_buffer_length; index++)
@@ -270,23 +262,17 @@ int main(int argc, const char* argv[])
 					}
 				}
 			}
-			code_stream[code_stream_length++] = previous_code;
 			Win_WriteCode(&w, previous_code, current_code_size);
-
 		}
-		code_stream[code_stream_length++] = end_of_information_code;
 		Win_WriteCode(&w, end_of_information_code, current_code_size);
-
 		if (w.block_length > 0)
 		{
 			Win_WriteBlock(&w);
 		}
-
-		VirtualFree(code_table,0,MEM_RELEASE);
-		VirtualFree(video,0,MEM_RELEASE);
-
 		Win_Write8(&w,0x00); //NOTE(cch): block terminator
 	}
+	VirtualFree(video,0,MEM_RELEASE);
+	VirtualFree(code_table,0,MEM_RELEASE);
 
 	// NOTE(cch): trailer
 	Win_Write8(&w,0x3B);
