@@ -42,6 +42,35 @@ Win_WriteString(WIN_GIF_WRITER *writer, char *string)
 	}
 }
 
+internal void
+Win_WriteBlock(WIN_GIF_WRITER *writer)
+{
+	Win_Write8(writer,writer->block_length);
+	for (int i = 0; i < writer->block_length; i++)
+	{
+		Win_Write8(writer, writer->data_block[i]);
+	}
+	writer->block_length = 0;
+}
+
+internal void
+Win_WriteCode(WIN_GIF_WRITER *writer, uint16 code, uint8 current_code_size)
+{
+	writer->byte = (uint8)(writer->byte | (code << writer->bits_written));
+	writer->bits_written += current_code_size;
+	if (writer->bits_written >= 8)
+	{
+		writer->data_block[writer->block_length++] = writer->byte;
+		writer->byte = 0;
+		writer->byte = (uint8)(code >> (8 - writer->bits_written + current_code_size));
+		writer->bits_written %= 8;
+		if (writer->block_length == 255)
+		{
+			Win_WriteBlock(writer);
+		}
+	}
+}
+
 int main(int argc, const char* argv[])
 {
 	MEMORY memory = {};
@@ -92,7 +121,6 @@ int main(int argc, const char* argv[])
 	VirtualFree(frame.memory,0,MEM_RELEASE);
 	VirtualFree(memory_block,0,MEM_RELEASE);
 
-
 ////////////////////////////////////////////////////////////////////////////////
 	// making a gif //
 ////////////////////////////////////////////////////////////////////////////////
@@ -122,6 +150,7 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0x00); // NOTE(cch): pixel aspect ratio
 
 	// NOTE(cch): global color table
+	// TODO(cch): actually compute the global color table
 	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
 	color_table[0] = {0xFF,0xFF,0xFF};
 	color_table[1] = {0xFF,0x00,0x00};
@@ -169,12 +198,16 @@ int main(int argc, const char* argv[])
 		uint8 lzw_minimum_code_size = COLOR_TABLE_SIZE_COMPRESSED + 1;
 		Win_Write8(&w,lzw_minimum_code_size);
 
+
+		uint8 current_code_size = lzw_minimum_code_size + 1;
+
 		// NOTE(cch): creating the code stream
 		uint16 table_position = COLOR_TABLE_SIZE; // NOTE(cch): the code table
 		uint16 clear_code = table_position++;
 		uint16 end_of_information_code = table_position++;
 		int code_stream_length = 0;
 		code_stream[code_stream_length] = clear_code;
+		Win_WriteCode(&w, clear_code, current_code_size);
 		int i = 0;
 		while (i < (frame.width * frame.height))
 		{
@@ -206,13 +239,21 @@ int main(int argc, const char* argv[])
 				}
 				if (index != index_buffer_length)
 				{
+					code_stream[code_stream_length++] = previous_code;
+					Win_WriteCode(&w, previous_code, current_code_size);
+
 					for (int index = 0; index < index_buffer_length; index++)
 					{
 						code_table[code_table_size].values[index] = index_buffer[index];
 					}
 					code_table[code_table_size].length = index_buffer_length;
+					if ((code_table_size + table_position) == (1 << current_code_size))
+					{
+						current_code_size++;
+					}
 					code_table_size++;
-					code_stream[code_stream_length++] = previous_code;
+
+
 					index_buffer[0] = index_buffer[index_buffer_length - 1];
 					for (int index = 1; index < index_buffer_length; index++)
 					{
@@ -230,34 +271,19 @@ int main(int argc, const char* argv[])
 				}
 			}
 			code_stream[code_stream_length++] = previous_code;
+			Win_WriteCode(&w, previous_code, current_code_size);
+
 		}
 		code_stream[code_stream_length++] = end_of_information_code;
+		Win_WriteCode(&w, end_of_information_code, current_code_size);
+
+		if (w.block_length > 0)
+		{
+			Win_WriteBlock(&w);
+		}
+
 		VirtualFree(code_table,0,MEM_RELEASE);
-
-		Win_Write8(&w,0x16); // NOTE(cch): sub-block size
-
-		Win_Write8(&w,0x8C);
-		Win_Write8(&w,0x2D);
-		Win_Write8(&w,0x99);
-		Win_Write8(&w,0x87);
-		Win_Write8(&w,0x2A);
-		Win_Write8(&w,0x1C);
-		Win_Write8(&w,0xDC);
-		Win_Write8(&w,0x33);
-		Win_Write8(&w,0xA0);
-		Win_Write8(&w,0x02);
-		Win_Write8(&w,0x75);
-		Win_Write8(&w,0xEC);
-		Win_Write8(&w,0x95);
-		Win_Write8(&w,0xFA);
-		Win_Write8(&w,0xA8);
-		Win_Write8(&w,0xDE);
-		Win_Write8(&w,0x60);
-		Win_Write8(&w,0x8C);
-		Win_Write8(&w,0x04);
-		Win_Write8(&w,0x91);
-		Win_Write8(&w,0x4C);
-		Win_Write8(&w,0x01);
+		VirtualFree(video,0,MEM_RELEASE);
 
 		Win_Write8(&w,0x00); //NOTE(cch): block terminator
 	}

@@ -16,7 +16,10 @@ struct WIN_FRAME
 struct WIN_GIF_WRITER
 {
 	FILE *file;
-	uint8 currentbyte;
+	uint8 data_block[255];
+	uint8 block_length;
+	uint8 byte;
+	uint8 bits_written;
 };
 
 struct WIN_CODE_TABLE_NODE
