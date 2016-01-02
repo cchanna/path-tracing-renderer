@@ -58,12 +58,12 @@ Win_WriteCode(WIN_GIF_WRITER *writer, uint16 code, uint8 current_code_size)
 {
 	writer->byte = (uint8)(writer->byte | (code << writer->bits_written));
 	writer->bits_written += current_code_size;
-	if (writer->bits_written >= 8)
+	while (writer->bits_written >= 8)
 	{
 		writer->data_block[writer->block_length++] = writer->byte;
 		writer->byte = 0;
 		writer->byte = (uint8)(code >> (8 - writer->bits_written + current_code_size));
-		writer->bits_written %= 8;
+		writer->bits_written -= 8;
 		if (writer->block_length == 255)
 		{
 			Win_WriteBlock(writer);
@@ -84,7 +84,7 @@ int main(int argc, const char* argv[])
 	int frame_memory_size = frame.width * frame.height * frame.bytes_per_pixel;
 	frame.memory = VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	int video_memory_size = frame_memory_size * frame_count;
-	video = (uint8 *)VirtualAlloc(0, video_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	video = (uint8 *) VirtualAlloc(0, video_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 #if GRAPHICS_INTERNAL
 	LPVOID base_address = 0;
@@ -98,23 +98,25 @@ int main(int argc, const char* argv[])
 	memory.transient_storage = ((uint8 *)memory_block + memory.permanent_storage_size);
 
 	// NOTE(cch): the actual rendering, saved into a single massive video data block
-	uint8 *pixel = video;
-	for (int i = 0; i < frame_count; i++)
 	{
-		GetNextFrame(&memory, &frame, i);
-		uint8 *source_pixel = (uint8 *) frame.memory;
-		for (uint64 y = 0; y < frame.height; y++)
+		uint8 *pixel = video;
+		for (int i = 0; i < frame_count; i++)
 		{
-			for(uint64 x = 0; x < frame.width; x++)
+			GetNextFrame(&memory, &frame, i);
+			uint8 *source_pixel = (uint8 *) frame.memory;
+			for (uint64 y = 0; y < frame.height; y++)
 			{
-				*pixel++ = *source_pixel;
-				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
-				*pixel++ = *source_pixel;
-				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
-				*pixel++ = *source_pixel;
-				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
-				*pixel++;
-				source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+				for(uint64 x = 0; x < frame.width; x++)
+				{
+					*pixel++ = *source_pixel;
+					source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+					*pixel++ = *source_pixel;
+					source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+					*pixel++ = *source_pixel;
+					source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+					*pixel++;
+					source_pixel = (uint8 *)(((uint64) source_pixel) + (frame.color_depth_bytes));
+				}
 			}
 		}
 	}
@@ -125,6 +127,9 @@ int main(int argc, const char* argv[])
 	// making a gif //
 ////////////////////////////////////////////////////////////////////////////////
 
+	int video_index_memory_size = video_memory_size / frame.bytes_per_pixel;
+	uint8 *video_index = (uint8 *) VirtualAlloc(0, video_index_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
 
 	WIN_CODE_TABLE_NODE *code_table = (WIN_CODE_TABLE_NODE *) VirtualAlloc(0, sizeof(WIN_CODE_TABLE_NODE) * 4096,MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	WIN_GIF_WRITER w = {};
@@ -147,7 +152,6 @@ int main(int argc, const char* argv[])
 
 	// NOTE(cch): global color table
 	// TODO(cch): actually compute the global color table
-	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
 	color_table[0] = {0xFF,0xFF,0xFF};
 	color_table[1] = {0xFF,0x00,0x00};
 	color_table[2] = {0x00,0x00,0xFF};
