@@ -129,7 +129,53 @@ int main(int argc, const char* argv[])
 
 	int video_index_memory_size = video_memory_size / frame.bytes_per_pixel;
 	uint8 *video_index = (uint8 *) VirtualAlloc(0, video_index_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	int index_buffer_size = 8;
+	uint16 *index_buffer = (uint16 *) VirtualAlloc(0, sizeof(uint16) * index_buffer_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
+
+	// NOTE(cch): build the color table
+	{
+		uint16 num_colors = 1;
+		color_table[0] = {0xFF,0xFF,0xFF};
+		uint8 *pixel = video;
+		uint8 *pixel_index = video_index;
+		for (int i = 0; i < frame_count * frame.height * frame.width; i++)
+		{
+			uint8 red = *pixel++;
+			uint8 green = *pixel++;
+			uint8 blue = *pixel++;
+			*pixel++;
+			// NOTE(cch): search the color table
+			uint16 color;
+			for (color = 0; color < num_colors; color++)
+			{
+				if (
+					red == color_table[color].red &&
+					green == color_table[color].green &&
+					blue == color_table[color].blue
+				){
+					*pixel_index++ = (uint8) color;
+					break;
+				}
+			}
+			if (color == num_colors)
+			{
+				if (num_colors < COLOR_TABLE_SIZE)
+				{
+					color_table[color].red = red;
+					color_table[color].green = green;
+					color_table[color].blue = blue;
+					*pixel_index++ = (uint8) color;
+					num_colors++;
+				}
+				else
+				{
+					*pixel_index++ = 0;
+					// TODO(cch): compress colors when the table runs out of room
+				}
+			}
+		}
+	}
 
 	WIN_CODE_TABLE_NODE *code_table = (WIN_CODE_TABLE_NODE *) VirtualAlloc(0, sizeof(WIN_CODE_TABLE_NODE) * 4096,MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	WIN_GIF_WRITER w = {};
@@ -151,11 +197,6 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0x00); // NOTE(cch): pixel aspect ratio
 
 	// NOTE(cch): global color table
-	// TODO(cch): actually compute the global color table
-	color_table[0] = {0xFF,0xFF,0xFF};
-	color_table[1] = {0xFF,0x00,0x00};
-	color_table[2] = {0x00,0x00,0xFF};
-	color_table[3] = {0x00,0x00,0x00};
 	for (int i = 0; i < COLOR_TABLE_SIZE; i++)
 	{
 		Win_Write8(&w,color_table[i].red);
@@ -172,56 +213,61 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0x00);
 	Win_Write8(&w,0x00);
 
-	uint8 example_image[100] = {
-		1,1,1,1,1,2,2,2,2,2,
-		1,1,1,1,1,2,2,2,2,2,
-		1,1,1,1,1,2,2,2,2,2,
-		1,1,1,0,0,0,0,2,2,2,
-		1,1,1,0,0,0,0,2,2,2,
-		2,2,2,0,0,0,0,1,1,1,
-		2,2,2,0,0,0,0,1,1,1,
-		2,2,2,2,2,1,1,1,1,1,
-		2,2,2,2,2,1,1,1,1,1,
-		2,2,2,2,2,1,1,1,1,1,
-	};
-
 	for (int current_frame = 0; current_frame < frame_count; current_frame++)
 	{
 		// NOTE(cch): image descriptor
 		Win_Write8(&w,0x2C);
 		Win_Write16(&w,0);   // NOTE(cch): image left
 		Win_Write16(&w,0);   // NOTE(cch): image top
-		Win_Write16(&w,10);  // NOTE(cch): image width
-		Win_Write16(&w,10);  // NOTE(cch): image height
+		Win_Write16(&w,frame.width);  // NOTE(cch): image width
+		Win_Write16(&w,frame.height);  // NOTE(cch): image height
 		Win_Write8(&w,0x00); // NOTE(cch): block terminator
 
 		// NOTE(cch): image data
 		uint8 lzw_minimum_code_size = COLOR_TABLE_SIZE_COMPRESSED + 1;
 		Win_Write8(&w,lzw_minimum_code_size);
 
-		uint8 current_code_size = lzw_minimum_code_size + 1;
 
 		// NOTE(cch): creating the code stream
 		uint16 table_position = COLOR_TABLE_SIZE; // NOTE(cch): the code table
 		uint16 clear_code = table_position++;
 		uint16 end_of_information_code = table_position++;
-		Win_WriteCode(&w, clear_code, current_code_size);
 		int i = 0;
+		uint8 current_code_size = 0;
 		while (i < (frame.width * frame.height))
 		{
-			uint16 index_buffer[256] = {};
+			Win_WriteCode(&w, clear_code, current_code_size);
+			current_code_size = lzw_minimum_code_size + 1;
 			uint16 index_buffer_length = 0;
-			index_buffer[index_buffer_length++] = example_image[i++];
+			index_buffer[index_buffer_length++] = video_index[i++];
 			int code_table_size = 0;
 
 			uint16 previous_code = index_buffer[0];
 			while (i < (frame.width * frame.height))
 			{
-				index_buffer[index_buffer_length++] = example_image[i++];
-				int index = 0;
-				for (uint16 code = 0; code < code_table_size; code++)
+
+				if (i >= 213*142 + 104)
 				{
-					index = 0;
+					char Buffer[256];
+					sprintf_s(Buffer, "%d\n, %d\n", i % 220, i / 220);
+					OutputDebugStringA(Buffer);
+				}
+				if (index_buffer_length >= index_buffer_size)
+				{
+					index_buffer_size = index_buffer_size << 1;
+					uint16 *temp_index_buffer = (uint16 *) VirtualAlloc(0, sizeof(uint16) * index_buffer_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+					for (int index = 0; index < index_buffer_length; index++)
+					{
+						temp_index_buffer[index] = index_buffer[index];
+					}
+					VirtualFree(index_buffer,0,MEM_RELEASE);
+					index_buffer = temp_index_buffer;
+				}
+				index_buffer[index_buffer_length++] = video_index[i++];
+				uint16 code;
+				for (code = 0; code < code_table_size; code++)
+				{
+					int index = 0;
 					if (index_buffer_length == code_table[code].length)
 					{
 						while ((index < index_buffer_length) && (index_buffer[index] == code_table[code].values[index]))
@@ -235,7 +281,7 @@ int main(int argc, const char* argv[])
 						}
 					}
 				}
-				if (index != index_buffer_length)
+				if (code == code_table_size)
 				{
 					Win_WriteCode(&w, previous_code, current_code_size);
 
@@ -260,7 +306,7 @@ int main(int argc, const char* argv[])
 
 					// NOTE(cch): if the code table reaches the maximum size, we
 					// start fresh with a new table
-					if (code_table_size == 4096)
+					if (code_table_size >= 2000)
 					{
 						break;
 					}
@@ -277,6 +323,7 @@ int main(int argc, const char* argv[])
 	}
 	VirtualFree(video,0,MEM_RELEASE);
 	VirtualFree(code_table,0,MEM_RELEASE);
+	VirtualFree(index_buffer,0,MEM_RELEASE);
 
 	// NOTE(cch): trailer
 	Win_Write8(&w,0x3B);
