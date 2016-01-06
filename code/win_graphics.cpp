@@ -8,10 +8,57 @@
 #include "graphics.cpp"
 #include "win_graphics.h"
 
+inline int64
+Win_GetTime(void)
+{
+	LARGE_INTEGER result;
+	QueryPerformanceCounter(&result);
+	return result.QuadPart;
+}
+
+inline void
+Win_StartTimer(WIN_TIMER *timer)
+{
+#if GRAPHICS_SLOW
+	if (timer->last_tick == 0)
+	{
+		timer->last_tick = Win_GetTime();
+		timer->time = 0;
+		LARGE_INTEGER performance_frequency;
+		QueryPerformanceFrequency(&performance_frequency);
+		timer->performance_frequency = performance_frequency.QuadPart;
+	}
+	else
+	{
+		timer->last_tick = Win_GetTime();
+	}
+#endif
+}
+
+inline float
+Win_StopTimer(WIN_TIMER *timer)
+{
+#if GRAPHICS_SLOW
+	int64 current_time = Win_GetTime();
+	timer->time += current_time - timer->last_tick;
+	timer->last_tick = current_time;
+	return ((float)timer->time) / ((float)timer->performance_frequency);
+#else
+	return 0.0f;
+#endif
+}
+
+inline float
+Win_GetTimerTime(WIN_TIMER *timer)
+{
+#if GRAPHICS_SLOW
+	return ((float)timer->time) / ((float)timer->performance_frequency);
+#else
+	return 0.0f;
+#endif
+}
 
 
-
-internal void
 inline void
 Win_Write8(WIN_GIF_WRITER *writer, uint8 byte)
 {
@@ -438,6 +485,7 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0x00); // NOTE(cch): transparent color index
 	Win_Write8(&w,0x00); // NOTE(cch): block terminator
 
+	WIN_TIMER timer = {};
 	for (int current_frame = 0; current_frame < frame_count; current_frame++)
 	{
 		// NOTE(cch): image descriptor
@@ -470,13 +518,6 @@ int main(int argc, const char* argv[])
 			uint16 previous_code = index_buffer[0];
 			while (i < (frame.width * frame.height))
 			{
-
-				if (i >= 213*142 + 104)
-				{
-					char Buffer[256];
-					sprintf_s(Buffer, "%d\n, %d\n", i % 220, i / 220);
-					OutputDebugStringA(Buffer);
-				}
 				if (index_buffer_length >= index_buffer_size)
 				{
 					index_buffer_size = index_buffer_size << 1;
@@ -490,6 +531,7 @@ int main(int argc, const char* argv[])
 				}
 				index_buffer[index_buffer_length++] = video_index[i++];
 				uint16 code;
+				Win_StartTimer(&timer);
 				for (code = 0; code < code_table_size; code++)
 				{
 					int index = 0;
@@ -506,6 +548,7 @@ int main(int argc, const char* argv[])
 						}
 					}
 				}
+				Win_StopTimer(&timer);
 				if (code == code_table_size)
 				{
 					Win_WriteCode(&w, previous_code, current_code_size);
@@ -531,7 +574,7 @@ int main(int argc, const char* argv[])
 
 					// NOTE(cch): if the code table reaches the maximum size, we
 					// start fresh with a new table
-					if (code_table_size >= 2000)
+					if (code_table_size >= 4000)
 					{
 						break;
 					}
@@ -546,6 +589,13 @@ int main(int argc, const char* argv[])
 		}
 		Win_Write8(&w,0x00); //NOTE(cch): block terminator
 	}
+#if GRAPHICS_SLOW
+	{
+		char Buffer[256];
+		sprintf_s(Buffer, "%f", Win_GetTimerTime(&timer));
+		OutputDebugStringA(Buffer);
+	}
+#endif
 	VirtualFree(video,0,MEM_RELEASE);
 	VirtualFree(code_table,0,MEM_RELEASE);
 	VirtualFree(index_buffer,0,MEM_RELEASE);
