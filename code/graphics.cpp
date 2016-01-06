@@ -12,8 +12,8 @@ InitializeMemory(MEMORY *memory, FRAME *frame)
 	memory->transient_storage_size = Kilobytes(1);
 
 
-	frame->width = 10;
-	frame->height = 10;
+	frame->width = 512;
+	frame->height = 512;
 	frame->color_depth_bytes = 1;
 	frame->bytes_per_pixel = frame->color_depth_bytes * 4;
 	frame->pitch = frame->bytes_per_pixel * frame->width;
@@ -32,7 +32,7 @@ Raytrace(COLOR *result, VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dit
 	float distance_object = 0;
 	uint32 sphere_num = 0;
 	COLOR color = {};
-	COLOR sky = {0.0f, 0.1f,0.25f};
+	COLOR sky = {1.0f, 1.0f,1.0f};
 	for (uint32 i = 0; i < state->num_spheres; i++)
 	{
 		SPHERE *sphere = &(state->spheres[i]);
