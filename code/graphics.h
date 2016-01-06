@@ -23,6 +23,13 @@ typedef uint64_t uint64;
 #define local_persist static
 #define global_variable static
 
+#if GRAPHICS_SLOW
+#define Assert(Expression) \
+    if(!(Expression)) {*(int *)0 = 0;}
+#else
+#define Assert(Expression)
+#endif
+
 #include "matrix_3d.h"
 #include "matrix_3d.cpp"
 
