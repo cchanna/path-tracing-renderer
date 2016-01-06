@@ -12,19 +12,20 @@
 
 
 internal void
+inline void
 Win_Write8(WIN_GIF_WRITER *writer, uint8 byte)
 {
 	fputc(byte, writer->file);
 }
 
-internal void
+inline void
 Win_Write16(WIN_GIF_WRITER *writer, uint16 value)
 {
 	fputc((uint8) value, writer->file);
 	fputc((uint8) (value >> 8), writer->file);
 }
 
-internal void
+inline void
 Win_WriteString(WIN_GIF_WRITER *writer, char *string)
 {
 	while(*string)
@@ -62,6 +63,199 @@ Win_WriteCode(WIN_GIF_WRITER *writer, uint16 code, uint8 current_code_size)
 	}
 }
 
+inline void
+Win_CopyColor(WIN_COLOR *color1, WIN_COLOR *color2)
+{
+	color1->red = color2->red;
+	color1->green = color2->green;
+	color1->blue = color2->blue;
+}
+
+internal int
+Win_GetSubcube(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color)
+{
+	WIN_COLOR_CUBE *cubes = c->cubes;
+	int red = (color.red >> level) & 1;
+	int green = (color.green >> level) & 1;
+	int blue = (color.blue >> level) & 1;
+	int subcube = cubes[cube].subcube[red][green][blue];
+	if (subcube == 0)
+	{
+		subcube = c->size;
+		cubes[cube].subcube[red][green][blue] = subcube;
+	}
+	return subcube;
+}
+
+internal void
+Win_CubeInsert(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color, int amount)
+{
+	WIN_COLOR_CUBE *cubes = c->cubes;
+	if (cube == -1)
+	{
+		cube = 0;
+	}
+	else
+	{
+		cube = Win_GetSubcube(c,cube,level,color);
+	}
+	if (cubes[cube].amount == 0)
+	{
+		Win_CopyColor(&(cubes[cube].color), &color);
+		c->size++;
+	}
+	cubes[cube].amount += amount;
+	if (cubes[cube].has_subcubes)
+	{
+		Win_CubeInsert(c,cube,level - 1,color,1);
+	}
+	else
+	{
+		if (
+			cubes[cube].color.red == color.red &&
+			cubes[cube].color.green == color.green &&
+			cubes[cube].color.blue == color.blue
+		){
+			// NOTE(cch): do nothing
+		}
+		else
+		{
+			cubes[cube].has_subcubes = TRUE;
+			Win_CubeInsert(c,cube,level - 1,cubes[cube].color,cubes[cube].amount - amount);
+			Win_CubeInsert(c,cube,level - 1,color,1);
+		}
+	}
+}
+
+inline void
+Win_CubeInsert(WIN_COLOR_CUBE_HEAD *c, WIN_COLOR color)
+{
+	Win_CubeInsert(c,-1,7,color,1);
+}
+
+internal void
+Win_SortCubes(WIN_COLOR_CUBE *cubes, int cube)
+{
+	int highest_cube = 0;
+	int highest_amount = 0;
+	int total_amount = 0;
+	if (cubes[cube].has_subcubes)
+	{
+		for (int r = 0; r < 2; r++)
+		{
+			for (int g = 0; g < 2; g++)
+			{
+				for (int b = 0; b < 2; b++)
+				{
+					int subcube = cubes[cube].subcube[r][g][b];
+					if (subcube > 0)
+					{
+						Win_SortCubes(cubes,subcube);
+						total_amount += cubes[subcube].amount;
+						if (cubes[subcube].amount > highest_amount)
+						{
+							highest_cube = subcube;
+							highest_amount = cubes[subcube].amount;
+						}
+					}
+				}
+			}
+		}
+		Assert(cubes[cube].amount == total_amount);
+		Win_CopyColor(&(cubes[cube].color),&(cubes[highest_cube].color));
+	}
+}
+
+inline void
+Win_SortCubes(WIN_COLOR_CUBE *cubes)
+{
+	Win_SortCubes(cubes,0);
+}
+
+
+internal uint8
+Win_CubeSearch(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color)
+{
+	WIN_COLOR_CUBE *cubes = c->cubes;
+	if (cube == -1)
+	{
+		cube = 0;
+	}
+	else
+	{
+		int subcube = Win_GetSubcube(c,cube,level,color);
+		Assert(cubes[subcube].has_subcubes || cubes[subcube].complete);
+		cube = subcube;
+	}
+	if (cubes[cube].complete)
+	{
+		return cubes[cube].color_index;
+	}
+	else
+	{
+		return Win_CubeSearch(c,cube,level - 1, color);
+	}
+}
+
+inline uint8
+Win_CubeSearch(WIN_COLOR_CUBE_HEAD *c, WIN_COLOR color)
+{
+	return Win_CubeSearch(c,-1,7,color);
+}
+
+inline void
+Win_HeapSwap(int *heap, int node_1, int node_2)
+{
+	int temp = heap[node_1];
+	heap[node_1] = heap[node_2];
+	heap[node_2] = temp;
+}
+
+internal void
+Win_HeapPush(int *heap, int cube, WIN_COLOR_CUBE *cubes)
+{
+	heap[0]++;
+	int current_node = heap[0];
+	heap[current_node] = cube;
+	int parent_node = current_node/2;
+	while (current_node > 1 && cubes[heap[parent_node]].amount < cubes[heap[current_node]].amount)
+	{
+		Win_HeapSwap(heap,current_node,parent_node);
+		current_node = parent_node;
+		parent_node = current_node/2;
+	}
+}
+
+internal int
+Win_HeapPop(int *heap, WIN_COLOR_CUBE *cubes)
+{
+	int current_node = 1;
+	int return_value = heap[current_node];
+	heap[current_node] = heap[heap[0]];
+	heap[heap[0]] = 0;
+	heap[0]--;
+	while (current_node <= heap[0])
+	{
+		int child_1 = current_node * 2;
+		if (child_1 <= heap[0])
+		{
+			int greater_child = child_1;
+			int child_2 = (current_node * 2) + 1;
+			if (child_2 <= heap[0] && cubes[heap[child_2]].amount > cubes[heap[child_1]].amount)
+			{
+				greater_child = child_2;
+			}
+			Win_HeapSwap(heap,current_node,greater_child);
+			current_node = greater_child;
+		}
+		else
+		{
+			break;
+		}
+	}
+	return return_value;
+}
+
 int main(int argc, const char* argv[])
 {
 	MEMORY memory = {};
@@ -72,9 +266,11 @@ int main(int argc, const char* argv[])
 	// NOTE(cch): the goal is for all allocations to be held exclusively in the
 	// platform layer. this way it's easier to keep track of where it's
 	// happening and is easily portable
-	int frame_memory_size = frame.width * frame.height * frame.bytes_per_pixel;
+	int pixels_in_frame = frame.width * frame.height;
+	int pixels_in_video = pixels_in_frame * frame_count;
+	int frame_memory_size = pixels_in_frame * frame.bytes_per_pixel;
 	frame.memory = VirtualAlloc(0, frame_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-	int video_memory_size = frame_memory_size * frame_count;
+	int video_memory_size = pixels_in_video * frame.bytes_per_pixel;
 	video = (uint8 *) VirtualAlloc(0, video_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 #if GRAPHICS_INTERNAL
@@ -118,54 +314,92 @@ int main(int argc, const char* argv[])
 	// making a gif //
 ////////////////////////////////////////////////////////////////////////////////
 
-	int video_index_memory_size = video_memory_size / frame.bytes_per_pixel;
+	int video_index_memory_size = pixels_in_video;
 	uint8 *video_index = (uint8 *) VirtualAlloc(0, video_index_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+
 	int index_buffer_size = 8;
 	uint16 *index_buffer = (uint16 *) VirtualAlloc(0, sizeof(uint16) * index_buffer_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
 
-	// NOTE(cch): build the color table
+	int color_heap[COLOR_TABLE_SIZE + 1] = {};
+	uint16 color_heap_size = 0;
+
+	WIN_COLOR color_table[COLOR_TABLE_SIZE] = {};
+	int num_colors = 0;
+
+	WIN_COLOR_CUBE_HEAD color_cube = {};
+	color_cube.cubes = (WIN_COLOR_CUBE *) VirtualAlloc(0, sizeof(WIN_COLOR_CUBE) * pixels_in_video * 8, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	int cube_size = 0;
+
+	// NOTE(cch): build the color cube
 	{
-		uint16 num_colors = 1;
-		color_table[0] = {0xFF,0xFF,0xFF};
 		uint8 *pixel = video;
-		uint8 *pixel_index = video_index;
+		int current_pixel = 0;
 		for (int i = 0; i < frame_count * frame.height * frame.width; i++)
 		{
-			uint8 red = *pixel++;
-			uint8 green = *pixel++;
-			uint8 blue = *pixel++;
+			WIN_COLOR color;
+			color.red = *pixel++;
+			color.green = *pixel++;
+			color.blue = *pixel++;
 			*pixel++;
-			// NOTE(cch): search the color table
-			uint16 color;
-			for (color = 0; color < num_colors; color++)
+			Win_CubeInsert(&color_cube,color);
+		}
+		Win_SortCubes(color_cube.cubes);
+	}
+	{
+		Win_HeapPush(color_heap, 0, color_cube.cubes);
+		while (color_heap[0] + num_colors < COLOR_TABLE_SIZE - 8)
+		{
+			int cube = Win_HeapPop(color_heap, color_cube.cubes);
+			if (color_cube.cubes[cube].has_subcubes)
 			{
-				if (
-					red == color_table[color].red &&
-					green == color_table[color].green &&
-					blue == color_table[color].blue
-				){
-					*pixel_index++ = (uint8) color;
-					break;
+				for (int r = 0; r < 2; r++)
+				{
+					for (int g = 0; g < 2; g++)
+					{
+						for (int b = 0; b < 2; b++)
+						{
+							int subcube = color_cube.cubes[cube].subcube[r][g][b];
+							if (subcube > 0)
+							{
+								Win_HeapPush(color_heap, subcube, color_cube.cubes);
+							}
+						}
+					}
 				}
 			}
-			if (color == num_colors)
+			else
 			{
-				if (num_colors < COLOR_TABLE_SIZE)
-				{
-					color_table[color].red = red;
-					color_table[color].green = green;
-					color_table[color].blue = blue;
-					*pixel_index++ = (uint8) color;
-					num_colors++;
-				}
-				else
-				{
-					*pixel_index++ = 0;
-					// TODO(cch): compress colors when the table runs out of room
-				}
+				color_cube.cubes[cube].complete = TRUE;
+				color_cube.cubes[cube].color_index = (uint8) num_colors;
+				Win_CopyColor(&color_table[num_colors], &(color_cube.cubes[cube].color));
+				num_colors++;
 			}
 		}
+		while (color_heap[0] > 0)
+		{
+			int cube = Win_HeapPop(color_heap, color_cube.cubes);
+			color_cube.cubes[cube].complete = TRUE;
+			color_cube.cubes[cube].color_index = (uint8) num_colors;
+			Win_CopyColor(&color_table[num_colors], &(color_cube.cubes[cube].color));
+			num_colors++;
+			Assert(num_colors <= 256);
+		}
+	}
+	{
+		uint8 *pixel = video;
+		uint8 *pixel_index = video_index;
+		int current_pixel = 0;
+		for (int i = 0; i < frame_count * frame.height * frame.width; i++)
+		{
+			WIN_COLOR color;
+			color.red = *pixel++;
+			color.green = *pixel++;
+			color.blue = *pixel++;
+			*pixel++;
+			uint8 index = Win_CubeSearch(&color_cube,color);
+			*pixel_index++ = index;
+		}
+
 	}
 
 	WIN_CODE_TABLE_NODE *code_table = (WIN_CODE_TABLE_NODE *) VirtualAlloc(0, sizeof(WIN_CODE_TABLE_NODE) * 4096,MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
@@ -196,13 +430,13 @@ int main(int argc, const char* argv[])
 	}
 
 	// NOTE(cch): graphics control extension
-	Win_Write8(&w,0x21); // NOTE(cch): background color index
-	Win_Write8(&w,0xF9);
-	Win_Write8(&w,0x04);
-	Win_Write8(&w,0x00);
+	Win_Write8(&w,0x21); // NOTE(cch): extension introducer
+	Win_Write8(&w,0xF9); // NOTE(cch): graphic control label
+	Win_Write8(&w,0x04); // NOTE(cch): byte size
+	Win_Write8(&w,0x01); // NOTE(cch): packaged field -- if transparency set to 01
 	Win_Write16(&w,frame.delay);
-	Win_Write8(&w,0x00);
-	Win_Write8(&w,0x00);
+	Win_Write8(&w,0x00); // NOTE(cch): transparent color index
+	Win_Write8(&w,0x00); // NOTE(cch): block terminator
 
 	for (int current_frame = 0; current_frame < frame_count; current_frame++)
 	{
