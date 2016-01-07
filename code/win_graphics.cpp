@@ -96,6 +96,11 @@ inline void
 Win_WriteByteToBlock(WIN_GIF_WRITER *writer)
 {
 	writer->data_block[writer->block_length++] = writer->byte;
+	writer->byte = 0;
+	if (writer->block_length == 255)
+	{
+		Win_WriteBlock(writer);
+	}
 }
 
 internal void
@@ -107,13 +112,8 @@ Win_WriteCode(WIN_GIF_WRITER *writer, int32 code, uint8 current_code_size)
 	while (writer->bits_written >= 8)
 	{
 		Win_WriteByteToBlock(writer);
-		writer->byte = 0;
 		writer->byte = (uint8)(code >> (8 - writer->bits_written + current_code_size));
 		writer->bits_written -= 8;
-		if (writer->block_length == 255)
-		{
-			Win_WriteBlock(writer);
-		}
 	}
 }
 
@@ -123,6 +123,28 @@ Win_CopyColor(WIN_COLOR *color1, WIN_COLOR *color2)
 	color1->red = color2->red;
 	color1->green = color2->green;
 	color1->blue = color2->blue;
+}
+
+internal void
+Win_CubeCopy(WIN_COLOR_CUBE *c_out, WIN_COLOR_CUBE *c_in)
+{
+	if (c_in->has_subcubes)
+	{
+		for (int r = 0; r < 2; r++)
+		{
+			for (int g = 0; g < 2; g++)
+			{
+				for (int b = 0; b < 2; b++)
+				{
+					c_out->subcube[r][g][b] = c_in->subcube[r][g][b];
+				}
+			}
+		}
+	}
+	c_out->amount = c_in->amount;
+	c_out->has_subcubes = c_in->has_subcubes;
+	c_out->color_index = c_in->color_index;
+	c_out->color = c_in->color;
 }
 
 internal int
@@ -135,6 +157,18 @@ Win_GetSubcube(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color)
 	int subcube = cubes[cube].subcube[red][green][blue];
 	if (subcube == 0)
 	{
+		if (c->size == c->max_size)
+		{
+			c->max_size *= 2;
+			WIN_COLOR_CUBE *cubes_tmp = (WIN_COLOR_CUBE *) VirtualAlloc(0, sizeof(WIN_COLOR_CUBE) * c->max_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			for (int i = 0; i < c->size; i++)
+			{
+				Win_CubeCopy(&(cubes_tmp[i]),&(cubes[i]));
+			}
+			VirtualFree(cubes, 0, MEM_RELEASE);
+			c->cubes = cubes_tmp;
+			cubes = c->cubes;
+		}
 		subcube = c->size;
 		cubes[cube].subcube[red][green][blue] = subcube;
 	}
@@ -142,9 +176,8 @@ Win_GetSubcube(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color)
 }
 
 internal void
-Win_CubeInsert(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color, int amount)
+Win_CubeInsert(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color, uint64 amount)
 {
-	WIN_COLOR_CUBE *cubes = c->cubes;
 	if (cube == -1)
 	{
 		cube = 0;
@@ -153,6 +186,7 @@ Win_CubeInsert(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color, int
 	{
 		cube = Win_GetSubcube(c,cube,level,color);
 	}
+	WIN_COLOR_CUBE *cubes = c->cubes;
 	if (cubes[cube].amount == 0)
 	{
 		Win_CopyColor(&(cubes[cube].color), &color);
@@ -191,8 +225,8 @@ internal void
 Win_SortCubes(WIN_COLOR_CUBE *cubes, int cube)
 {
 	int highest_cube = 0;
-	int highest_amount = 0;
-	int total_amount = 0;
+	uint64 highest_amount = 0;
+	uint64 total_amount = 0;
 	if (cubes[cube].has_subcubes)
 	{
 		for (int r = 0; r < 2; r++)
@@ -237,16 +271,15 @@ Win_CubeSearch(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color)
 	else
 	{
 		int subcube = Win_GetSubcube(c,cube,level,color);
-		Assert(cubes[subcube].has_subcubes || cubes[subcube].complete);
 		cube = subcube;
 	}
-	if (cubes[cube].complete)
+	if (cubes[cube].has_subcubes)
 	{
-		return cubes[cube].color_index;
+		return Win_CubeSearch(c,cube,level - 1, color);
 	}
 	else
 	{
-		return Win_CubeSearch(c,cube,level - 1, color);
+		return cubes[cube].color_index;
 	}
 }
 
@@ -396,7 +429,8 @@ int main(int argc, const char* argv[])
 	int num_colors = 0;
 
 	WIN_COLOR_CUBE_HEAD color_cube = {};
-	color_cube.cubes = (WIN_COLOR_CUBE *) VirtualAlloc(0, sizeof(WIN_COLOR_CUBE) * pixels_in_video * 8, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	color_cube.max_size = 2048;
+	color_cube.cubes = (WIN_COLOR_CUBE *) VirtualAlloc(0, sizeof(WIN_COLOR_CUBE) * color_cube.max_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	int cube_size = 0;
 
 	uint64 code_tree_memory_size = sizeof(WIN_LZW_NODE) * MAX_CODE_TREE_SIZE;
@@ -441,7 +475,7 @@ int main(int argc, const char* argv[])
 			}
 			else
 			{
-				color_cube.cubes[cube].complete = TRUE;
+				color_cube.cubes[cube].has_subcubes = FALSE;
 				color_cube.cubes[cube].color_index = (uint8) num_colors;
 				Win_CopyColor(&color_table[num_colors], &(color_cube.cubes[cube].color));
 				num_colors++;
@@ -450,7 +484,7 @@ int main(int argc, const char* argv[])
 		while (color_heap[0] > 0)
 		{
 			int cube = Win_HeapPop(color_heap, color_cube.cubes);
-			color_cube.cubes[cube].complete = TRUE;
+			color_cube.cubes[cube].has_subcubes = FALSE;
 			color_cube.cubes[cube].color_index = (uint8) num_colors;
 			Win_CopyColor(&color_table[num_colors], &(color_cube.cubes[cube].color));
 			num_colors++;
@@ -505,7 +539,7 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0xFF); // NOTE(cch): application extension label
 	Win_Write8(&w,11); // NOTE(cch): eleven bytes follow
 	Win_WriteString(&w,"NETSCAPE2.0");
-	Win_Write8(&w,0x03); // NOTE(cch): three bytes follow
+	Win_Write8(&w,3); // NOTE(cch): three bytes follow
 	Win_Write8(&w,0x01); // NOTE(cch): *shrug*
 	Win_Write16(&w,0); // NOTE(cch): repeat forever
 	Win_Write8(&w,0x00); // NOTE(cch): block terminator
@@ -518,7 +552,7 @@ int main(int argc, const char* argv[])
 		Win_Write8(&w,0xF9); // NOTE(cch): graphic control label
 		Win_Write8(&w,0x04); // NOTE(cch): byte size
 		uint8 packaged_field = 0;
-		if (TRANSPARENT)
+		if (IMAGE_TRANSPARENT)
 		{
 			packaged_field = packaged_field | 1;
 		}
@@ -534,7 +568,7 @@ int main(int argc, const char* argv[])
 		Win_Write16(&w,0);   // NOTE(cch): image top
 		Win_Write16(&w,frame.width);  // NOTE(cch): image width
 		Win_Write16(&w,frame.height);  // NOTE(cch): image height
-		Win_Write8(&w,0x00); // NOTE(cch): block terminator
+		Win_Write8(&w,0x00); // NOTE(cch): no local color table
 
 		// NOTE(cch): image data
 		uint8 lzw_minimum_code_size = COLOR_TABLE_SIZE_COMPRESSED + 1;
@@ -554,7 +588,7 @@ int main(int argc, const char* argv[])
 		{
 			uint16 next_index = video_index[pixels_in_frame * current_frame + i++];
 			Win_StartTimer(&timer);
-			
+
 			// NOTE(cch): search for matching code run in code treeA
 			if (code_tree[current_code].next[next_index])
 			{
@@ -582,12 +616,13 @@ int main(int argc, const char* argv[])
 				current_code = next_index;
 			}
 		}
+		memset(code_tree,0,code_tree_memory_size);
 		Win_WriteCode(&w, current_code, current_code_size);
+		Win_WriteCode(&w, clear_code, current_code_size);
 		Win_WriteCode(&w, end_of_information_code, current_code_size);
 		if (w.bits_written > 0)
 		{
 			Win_WriteByteToBlock(&w);
-			w.byte = 0;
 			w.bits_written = 0;
 		}
 		if (w.block_length > 0)

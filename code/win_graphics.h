@@ -39,9 +39,8 @@ struct WIN_TIMER
 struct WIN_COLOR_CUBE
 {
 	int subcube[2][2][2];
-	int amount;
-	bool32 has_subcubes;
-	bool32 complete;
+	uint64 amount;
+	uint8 has_subcubes;
 	uint8 color_index;
 	WIN_COLOR color;
 };
@@ -50,6 +49,7 @@ struct WIN_COLOR_CUBE_HEAD
 {
 	WIN_COLOR_CUBE *cubes;
 	int size;
+	uint64 max_size;
 };
 
 

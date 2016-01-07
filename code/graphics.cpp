@@ -1,7 +1,7 @@
 // NOTE(cch): where the magic happens
 
-#define FRAME_COUNT 50
-#define TRANSPARENT 1
+#define FRAME_COUNT 200
+#define IMAGE_TRANSPARENT 0
 
 internal int
 InitializeMemory(MEMORY *memory, FRAME *frame)
@@ -33,7 +33,7 @@ Raytrace(COLOR *result, VECTOR3D *eye, VECTOR3D *vector, STATE *state, float dit
 	float distance_object = 0;
 	uint32 sphere_num = 0;
 	COLOR color = {};
-	COLOR sky = {1.0f, 1.0f,1.0f};
+	COLOR sky = {0.0f, 0.1f,0.25f};
 	for (uint32 i = 0; i < state->num_spheres; i++)
 	{
 		SPHERE *sphere = &(state->spheres[i]);
