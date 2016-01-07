@@ -22,10 +22,11 @@ struct WIN_COLOR
 	uint8 red, green, blue;
 };
 
-struct WIN_CODE_TABLE_NODE
+#define MAX_CODE_TREE_SIZE 4096
+
+struct WIN_LZW_NODE
 {
-	uint16 values[256];
-	uint16 length;
+	uint16 next[256];
 };
 
 struct WIN_TIMER

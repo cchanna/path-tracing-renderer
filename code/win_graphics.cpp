@@ -92,14 +92,21 @@ Win_WriteBlock(WIN_GIF_WRITER *writer)
 	writer->block_length = 0;
 }
 
-internal void
-Win_WriteCode(WIN_GIF_WRITER *writer, uint16 code, uint8 current_code_size)
+inline void
+Win_WriteByteToBlock(WIN_GIF_WRITER *writer)
 {
+	writer->data_block[writer->block_length++] = writer->byte;
+}
+
+internal void
+Win_WriteCode(WIN_GIF_WRITER *writer, int32 code, uint8 current_code_size)
+{
+	Assert(code >= 0 && code < 4096);
 	writer->byte = (uint8)(writer->byte | (code << writer->bits_written));
 	writer->bits_written += current_code_size;
 	while (writer->bits_written >= 8)
 	{
-		writer->data_block[writer->block_length++] = writer->byte;
+		Win_WriteByteToBlock(writer);
 		writer->byte = 0;
 		writer->byte = (uint8)(code >> (8 - writer->bits_written + current_code_size));
 		writer->bits_written -= 8;
@@ -219,7 +226,6 @@ Win_SortCubes(WIN_COLOR_CUBE *cubes)
 	Win_SortCubes(cubes,0);
 }
 
-
 internal uint8
 Win_CubeSearch(WIN_COLOR_CUBE_HEAD *c, int cube, int level, WIN_COLOR color)
 {
@@ -303,6 +309,25 @@ Win_HeapPop(int *heap, WIN_COLOR_CUBE *cubes)
 	return return_value;
 }
 
+// internal int
+// Win_CodeTable_GetNextNode(WIN_CODES *codes)
+// {
+// 	Assert(codes->node_count <= codes->max_nodes);
+// 	if (codes->node_count == codes->max_nodes)
+// 	{
+// 		codes->max_nodes *= 2;
+// 		WIN_CODE_TABLE_NODE *temp_nodes = (WIN_CODE_TABLE_NODE *) VirtualAlloc(0, sizeof(WIN_CODE_TABLE_NODE) * codes->max_nodes, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+// 		for (int i = 0; i < codes->node_count; i++)
+// 		{
+// 			temp_nodes[i].next_node = codes->nodes[i].next_node;
+// 			temp_nodes[i].value = codes->nodes[i].value;
+// 		}
+// 		VirtualFree(codes->nodes,0,MEM_RELEASE);
+// 		codes->nodes = temp_nodes;
+// 	}
+// 	return codes->node_count++;
+// }
+
 int main(int argc, const char* argv[])
 {
 	MEMORY memory = {};
@@ -361,11 +386,8 @@ int main(int argc, const char* argv[])
 	// making a gif //
 ////////////////////////////////////////////////////////////////////////////////
 
-	int video_index_memory_size = pixels_in_video;
+	uint64 video_index_memory_size = pixels_in_video;
 	uint8 *video_index = (uint8 *) VirtualAlloc(0, video_index_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-
-	int index_buffer_size = 8;
-	uint16 *index_buffer = (uint16 *) VirtualAlloc(0, sizeof(uint16) * index_buffer_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 	int color_heap[COLOR_TABLE_SIZE + 1] = {};
 	uint16 color_heap_size = 0;
@@ -377,11 +399,14 @@ int main(int argc, const char* argv[])
 	color_cube.cubes = (WIN_COLOR_CUBE *) VirtualAlloc(0, sizeof(WIN_COLOR_CUBE) * pixels_in_video * 8, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	int cube_size = 0;
 
+	uint64 code_tree_memory_size = sizeof(WIN_LZW_NODE) * MAX_CODE_TREE_SIZE;
+	WIN_LZW_NODE *code_tree = (WIN_LZW_NODE *) VirtualAlloc(0,code_tree_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+
 	// NOTE(cch): build the color cube
 	{
 		uint8 *pixel = video;
 		int current_pixel = 0;
-		for (int i = 0; i < frame_count * frame.height * frame.width; i++)
+		for (int i = 0; i < pixels_in_video; i++)
 		{
 			WIN_COLOR color;
 			color.red = *pixel++;
@@ -436,7 +461,7 @@ int main(int argc, const char* argv[])
 		uint8 *pixel = video;
 		uint8 *pixel_index = video_index;
 		int current_pixel = 0;
-		for (int i = 0; i < frame_count * frame.height * frame.width; i++)
+		for (int i = 0; i < pixels_in_video; i++)
 		{
 			WIN_COLOR color;
 			color.red = *pixel++;
@@ -449,7 +474,6 @@ int main(int argc, const char* argv[])
 
 	}
 
-	WIN_CODE_TABLE_NODE *code_table = (WIN_CODE_TABLE_NODE *) VirtualAlloc(0, sizeof(WIN_CODE_TABLE_NODE) * 4096,MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	WIN_GIF_WRITER w = {};
 	w.file = 0;
 	fopen_s(&(w.file), "test.gif", "wb");
@@ -476,18 +500,34 @@ int main(int argc, const char* argv[])
 		Win_Write8(&w,color_table[i].blue);
 	}
 
-	// NOTE(cch): graphics control extension
+	// NOTE(cch) application extension (animation)
 	Win_Write8(&w,0x21); // NOTE(cch): extension introducer
-	Win_Write8(&w,0xF9); // NOTE(cch): graphic control label
-	Win_Write8(&w,0x04); // NOTE(cch): byte size
-	Win_Write8(&w,0x01); // NOTE(cch): packaged field -- if transparency set to 01
-	Win_Write16(&w,frame.delay);
-	Win_Write8(&w,0x00); // NOTE(cch): transparent color index
+	Win_Write8(&w,0xFF); // NOTE(cch): application extension label
+	Win_Write8(&w,11); // NOTE(cch): eleven bytes follow
+	Win_WriteString(&w,"NETSCAPE2.0");
+	Win_Write8(&w,0x03); // NOTE(cch): three bytes follow
+	Win_Write8(&w,0x01); // NOTE(cch): *shrug*
+	Win_Write16(&w,0); // NOTE(cch): repeat forever
 	Win_Write8(&w,0x00); // NOTE(cch): block terminator
 
 	WIN_TIMER timer = {};
 	for (int current_frame = 0; current_frame < frame_count; current_frame++)
 	{
+		// NOTE(cch): graphics control extension
+		Win_Write8(&w,0x21); // NOTE(cch): extension introducer
+		Win_Write8(&w,0xF9); // NOTE(cch): graphic control label
+		Win_Write8(&w,0x04); // NOTE(cch): byte size
+		uint8 packaged_field = 0;
+		if (TRANSPARENT)
+		{
+			packaged_field = packaged_field | 1;
+		}
+		packaged_field = packaged_field | (1 << 2); // NOTE(cch): disposal method
+		Win_Write8(&w,packaged_field);
+		Win_Write16(&w,frame.delay);
+		Win_Write8(&w,0x00); // NOTE(cch): transparent color index
+		Win_Write8(&w,0x00); // NOTE(cch): block terminator
+
 		// NOTE(cch): image descriptor
 		Win_Write8(&w,0x2C);
 		Win_Write16(&w,0);   // NOTE(cch): image left
@@ -502,87 +542,54 @@ int main(int argc, const char* argv[])
 
 
 		// NOTE(cch): creating the code stream
-		uint16 table_position = COLOR_TABLE_SIZE; // NOTE(cch): the code table
-		uint16 clear_code = table_position++;
-		uint16 end_of_information_code = table_position++;
+		uint16 tree_size = COLOR_TABLE_SIZE;
+		uint16 clear_code = tree_size++;
+		uint16 end_of_information_code = tree_size++;
 		int i = 0;
-		uint8 current_code_size = 0;
-		while (i < (frame.width * frame.height))
+		uint8 current_code_size = lzw_minimum_code_size + 1;
+		Win_WriteCode(&w, clear_code, current_code_size);
+
+		int32 current_code = video_index[pixels_in_frame * current_frame + i++];
+		while (i < (pixels_in_frame))
 		{
-			Win_WriteCode(&w, clear_code, current_code_size);
-			current_code_size = lzw_minimum_code_size + 1;
-			uint16 index_buffer_length = 0;
-			index_buffer[index_buffer_length++] = video_index[i++];
-			int code_table_size = 0;
-
-			uint16 previous_code = index_buffer[0];
-			while (i < (frame.width * frame.height))
+			uint16 next_index = video_index[pixels_in_frame * current_frame + i++];
+			Win_StartTimer(&timer);
+			
+			// NOTE(cch): search for matching code run in code treeA
+			if (code_tree[current_code].next[next_index])
 			{
-				if (index_buffer_length >= index_buffer_size)
-				{
-					index_buffer_size = index_buffer_size << 1;
-					uint16 *temp_index_buffer = (uint16 *) VirtualAlloc(0, sizeof(uint16) * index_buffer_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-					for (int index = 0; index < index_buffer_length; index++)
-					{
-						temp_index_buffer[index] = index_buffer[index];
-					}
-					VirtualFree(index_buffer,0,MEM_RELEASE);
-					index_buffer = temp_index_buffer;
-				}
-				index_buffer[index_buffer_length++] = video_index[i++];
-				uint16 code;
-				Win_StartTimer(&timer);
-				for (code = 0; code < code_table_size; code++)
-				{
-					int index = 0;
-					if (index_buffer_length == code_table[code].length)
-					{
-						while ((index < index_buffer_length) && (index_buffer[index] == code_table[code].values[index]))
-						{
-							index++;
-						}
-						if (index == index_buffer_length)
-						{
-							previous_code = code + table_position;
-							break;
-						}
-					}
-				}
-				Win_StopTimer(&timer);
-				if (code == code_table_size)
-				{
-					Win_WriteCode(&w, previous_code, current_code_size);
-
-					for (int index = 0; index < index_buffer_length; index++)
-					{
-						code_table[code_table_size].values[index] = index_buffer[index];
-					}
-					code_table[code_table_size].length = index_buffer_length;
-					if ((code_table_size + table_position) == (1 << current_code_size))
-					{
-						current_code_size++;
-					}
-					code_table_size++;
-
-					index_buffer[0] = index_buffer[index_buffer_length - 1];
-					for (int index = 1; index < index_buffer_length; index++)
-					{
-						index_buffer[index] = 0;
-					}
-					index_buffer_length = 1;
-					previous_code = index_buffer[0];
-
-					// NOTE(cch): if the code table reaches the maximum size, we
-					// start fresh with a new table
-					if (code_table_size >= 4000)
-					{
-						break;
-					}
-				}
+				current_code = code_tree[current_code].next[next_index];
 			}
-			Win_WriteCode(&w, previous_code, current_code_size);
+			else
+			{
+				Win_WriteCode(&w, current_code, current_code_size);
+				if (tree_size == (1 << current_code_size))
+				{
+					current_code_size++;
+				}
+				code_tree[current_code].next[next_index] = tree_size++;
+
+				// NOTE(cch): if the code table reaches the maximum size, we
+				// start fresh with a new table
+				Assert(tree_size <= MAX_CODE_TREE_SIZE)
+				if (tree_size == MAX_CODE_TREE_SIZE)
+				{
+					Win_WriteCode(&w, clear_code, current_code_size);
+					memset(code_tree,0,code_tree_memory_size);
+					current_code_size = lzw_minimum_code_size + 1;
+					tree_size = end_of_information_code + 1;
+				}
+				current_code = next_index;
+			}
 		}
+		Win_WriteCode(&w, current_code, current_code_size);
 		Win_WriteCode(&w, end_of_information_code, current_code_size);
+		if (w.bits_written > 0)
+		{
+			Win_WriteByteToBlock(&w);
+			w.byte = 0;
+			w.bits_written = 0;
+		}
 		if (w.block_length > 0)
 		{
 			Win_WriteBlock(&w);
@@ -597,8 +604,9 @@ int main(int argc, const char* argv[])
 	}
 #endif
 	VirtualFree(video,0,MEM_RELEASE);
-	VirtualFree(code_table,0,MEM_RELEASE);
-	VirtualFree(index_buffer,0,MEM_RELEASE);
+	VirtualFree(video_index,0,MEM_RELEASE);
+	VirtualFree(code_tree,0,MEM_RELEASE);
+	VirtualFree(color_cube.cubes,0,MEM_RELEASE);
 
 	// NOTE(cch): trailer
 	Win_Write8(&w,0x3B);
