@@ -7,9 +7,11 @@ renders as gifs.
 
 I have been rebuilding the original functionality element by element, so I can
 feel more comfortable with the process and hopefully create a more efficient and
-readable implementation. The flickering and image quality issues are a result
-of using ginsweater's gif-h -- I will replace it with something more consistent
-as a project at some point.
+readable implementation.
+
+I also wrote my own code for outputting gifs. Credit goes to ginsweater's
+[gif-h](https://github.com/ginsweater/gif-h) and Matthew Flickinger's
+[What's in a GIF - Byte by Byte] for making that possibile.
 
 - [X] Platform layer
 - [X] Ray-tracing
@@ -17,7 +19,7 @@ as a project at some point.
 - [X] Dithering
 - [X] Abstracted shapes
 - [X] Shape color
-- [ ] Custom gif-making code
+- [X] Custom gif-making code
 - [ ] Abstracted light
 - [ ] Colored light
 - [ ] Planes
