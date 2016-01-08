@@ -1,6 +1,6 @@
 // NOTE(cch): where the magic happens
 
-#define FRAME_COUNT 200
+#define FRAME_COUNT 250
 #define IMAGE_TRANSPARENT 0
 
 internal int

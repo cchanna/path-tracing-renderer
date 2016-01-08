@@ -361,6 +361,17 @@ Win_HeapPop(int *heap, WIN_COLOR_CUBE *cubes)
 // 	return codes->node_count++;
 // }
 
+internal uint8
+Win_GetNextValue(WIN_IMAGE *image)
+{
+	int i = 0;
+	i += ((image->current_pixel % image->width) + image->left); // NOTE(cch):x
+	i += (((image->current_pixel / image->width) + image->top) * image->frame_width); // NOTE(cch):y
+	image->current_pixel++;
+	image->current_pixel %= image->width * image->height;
+	return image->values[i];
+}
+
 int main(int argc, const char* argv[])
 {
 	MEMORY memory = {};
@@ -419,8 +430,12 @@ int main(int argc, const char* argv[])
 	// making a gif //
 ////////////////////////////////////////////////////////////////////////////////
 
-	uint64 video_index_memory_size = pixels_in_video;
-	uint8 *video_index = (uint8 *) VirtualAlloc(0, video_index_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	WIN_IMAGE image = {};
+	uint64 frame_index_memory_size = pixels_in_frame;
+	image.values = (uint8 *) VirtualAlloc(0, pixels_in_frame, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	image.previous_values = (uint8 *) VirtualAlloc(0, pixels_in_frame, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	image.frame_width = frame.width;
+	image.frame_height = frame.height;
 
 	int color_heap[COLOR_TABLE_SIZE + 1] = {};
 	uint16 color_heap_size = 0;
@@ -491,22 +506,6 @@ int main(int argc, const char* argv[])
 			Assert(num_colors <= 256);
 		}
 	}
-	{
-		uint8 *pixel = video;
-		uint8 *pixel_index = video_index;
-		int current_pixel = 0;
-		for (int i = 0; i < pixels_in_video; i++)
-		{
-			WIN_COLOR color;
-			color.red = *pixel++;
-			color.green = *pixel++;
-			color.blue = *pixel++;
-			*pixel++;
-			uint8 index = Win_CubeSearch(&color_cube,color);
-			*pixel_index++ = index;
-		}
-
-	}
 
 	WIN_GIF_WRITER w = {};
 	w.file = 0;
@@ -545,8 +544,63 @@ int main(int argc, const char* argv[])
 	Win_Write8(&w,0x00); // NOTE(cch): block terminator
 
 	WIN_TIMER timer = {};
+	uint8 *pixel = video;
 	for (int current_frame = 0; current_frame < frame_count; current_frame++)
 	{
+		image.left = frame.width - 1;
+		image.right = 0;
+		image.top = frame.height - 1;
+		image.bottom = 0;
+		image.width;
+		image.height;
+		{
+			for (int i = 0; i < pixels_in_frame; i++)
+			{
+				WIN_COLOR color;
+				color.red = *pixel++;
+				color.green = *pixel++;
+				color.blue = *pixel++;
+				*pixel++;
+				uint8 index = Win_CubeSearch(&color_cube,color);
+				image.values[i] = index;
+				if (current_frame > 0)
+				{
+					if (image.values[i] != image.previous_values[i])
+					{
+						uint16 x = i % frame.width;
+						if (x < image.left)
+						{
+							image.left = x;
+						}
+						if (x > image.right)
+						{
+							image.right = x;
+						}
+						uint16 y = (uint16) (i / frame.width);
+						if (y < image.top)
+						{
+							image.top = y;
+						}
+						if (y > image.bottom)
+						{
+							image.bottom = y;
+						}
+					}
+				}
+			}
+			if (current_frame > 0)
+			{
+				image.width = image.right - image.left + 1;
+				image.height = image.bottom - image.top + 1;
+			}
+			else
+			{
+				image.left = 0;
+				image.top = 0;
+				image.width = frame.width;
+				image.height = frame.height;
+			}
+		}
 		// NOTE(cch): graphics control extension
 		Win_Write8(&w,0x21); // NOTE(cch): extension introducer
 		Win_Write8(&w,0xF9); // NOTE(cch): graphic control label
@@ -564,32 +618,30 @@ int main(int argc, const char* argv[])
 
 		// NOTE(cch): image descriptor
 		Win_Write8(&w,0x2C);
-		Win_Write16(&w,0);   // NOTE(cch): image left
-		Win_Write16(&w,0);   // NOTE(cch): image top
-		Win_Write16(&w,frame.width);  // NOTE(cch): image width
-		Win_Write16(&w,frame.height);  // NOTE(cch): image height
+		Win_Write16(&w,image.left);   // NOTE(cch): image left
+		Win_Write16(&w,image.top);   // NOTE(cch): image top
+		Win_Write16(&w,image.width);  // NOTE(cch): image width
+		Win_Write16(&w,image.height);  // NOTE(cch): image height
 		Win_Write8(&w,0x00); // NOTE(cch): no local color table
 
 		// NOTE(cch): image data
 		uint8 lzw_minimum_code_size = COLOR_TABLE_SIZE_COMPRESSED + 1;
 		Win_Write8(&w,lzw_minimum_code_size);
 
-
 		// NOTE(cch): creating the code stream
 		uint16 tree_size = COLOR_TABLE_SIZE;
 		uint16 clear_code = tree_size++;
 		uint16 end_of_information_code = tree_size++;
-		int i = 0;
 		uint8 current_code_size = lzw_minimum_code_size + 1;
 		Win_WriteCode(&w, clear_code, current_code_size);
 
-		int32 current_code = video_index[pixels_in_frame * current_frame + i++];
-		while (i < (pixels_in_frame))
+		int32 current_code = Win_GetNextValue(&image);
+		for (int i = 1; i < image.width * image.height; i++)
 		{
-			uint16 next_index = video_index[pixels_in_frame * current_frame + i++];
+			uint16 next_index = Win_GetNextValue(&image);
 			Win_StartTimer(&timer);
 
-			// NOTE(cch): search for matching code run in code treeA
+			// NOTE(cch): search for matching code run in code tree
 			if (code_tree[current_code].next[next_index])
 			{
 				current_code = code_tree[current_code].next[next_index];
@@ -630,6 +682,10 @@ int main(int argc, const char* argv[])
 			Win_WriteBlock(&w);
 		}
 		Win_Write8(&w,0x00); //NOTE(cch): block terminator
+		uint8 *values_tmp = image.previous_values;
+		image.previous_values = image.values;
+		image.values = values_tmp;
+
 	}
 #if GRAPHICS_SLOW
 	{
@@ -639,7 +695,8 @@ int main(int argc, const char* argv[])
 	}
 #endif
 	VirtualFree(video,0,MEM_RELEASE);
-	VirtualFree(video_index,0,MEM_RELEASE);
+	VirtualFree(image.values,0,MEM_RELEASE);
+	VirtualFree(image.previous_values,0,MEM_RELEASE);
 	VirtualFree(code_tree,0,MEM_RELEASE);
 	VirtualFree(color_cube.cubes,0,MEM_RELEASE);
 

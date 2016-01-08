@@ -22,6 +22,15 @@ struct WIN_COLOR
 	uint8 red, green, blue;
 };
 
+struct WIN_IMAGE
+{
+	uint8 *values;
+	uint8 *previous_values;
+	uint16 frame_width,frame_height;
+	uint16 left,right,top,bottom,width,height;
+	int current_pixel;
+};
+
 #define MAX_CODE_TREE_SIZE 4096
 
 struct WIN_LZW_NODE
