@@ -11,7 +11,8 @@ readable implementation.
 
 I also wrote my own code for outputting gifs. Credit goes to ginsweater's
 [gif-h](https://github.com/ginsweater/gif-h) and Matthew Flickinger's
-[What's in a GIF - Byte by Byte] for making that possibile.
+[What's in a GIF - Byte by Byte](http://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp)
+for making that possibile.
 
 - [X] Platform layer
 - [X] Ray-tracing
