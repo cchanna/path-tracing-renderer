@@ -1,5 +1,17 @@
 #if !defined (GRAPHICS_H)
 
+typedef int8_t int8;
+typedef int16_t int16;
+typedef int32_t int32;
+typedef int64_t int64;
+
+typedef int32 bool32;
+
+typedef uint8_t uint8;
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
+
 #define Kilobytes(Value) (Value*1024LL)
 #define Megabytes(Value) (Kilobytes(Value)*1024LL)
 #define Gigabytes(Value) (Megabytes(Value)*1024LL)
@@ -10,6 +22,13 @@
 #define internal static
 #define local_persist static
 #define global_variable static
+
+#if GRAPHICS_SLOW
+#define Assert(Expression) \
+    if(!(Expression)) {*(int *)0 = 0;}
+#else
+#define Assert(Expression)
+#endif
 
 #include "matrix_3d.h"
 #include "matrix_3d.cpp"
@@ -28,12 +47,12 @@ struct MEMORY
 struct FRAME
 {
 	void *memory;
-    uint32 width;
-    uint32 height;
-    uint32 pitch;
-	uint32 color_depth_bytes;
-	uint32 bytes_per_pixel;
-	uint32 delay;
+    uint16 width;
+    uint16 height;
+	uint16 delay;
+	uint16 color_depth_bytes;
+	uint16 bytes_per_pixel;
+	uint32 pitch;
 	float dithering;
 };
 
